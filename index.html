@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0d1117" />
+  <meta name="description" content="Barcodes erstellen, speichern, sortieren und teilen." />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <title>CodeBox</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0d1117;
+      --card:#161b22;
+      --card2:#0f141b;
+      --text:#f0f6fc;
+      --muted:#8b949e;
+      --border:#30363d;
+      --accent:#2f81f7;
+      --danger:#f85149;
+      --success:#3fb950;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:Arial,Helvetica,sans-serif;
+      background:linear-gradient(180deg,#0d1117,#090c10);
+      color:var(--text);
+      padding:24px;
+    }
+
+    .app{width:min(960px,100%);margin:0 auto}
+    h1{margin:0 0 6px;font-size:32px}
+    h2{margin:28px 0 12px;font-size:22px}
+    .subtitle{color:var(--muted);margin-bottom:22px}
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:20px;
+      box-shadow:0 12px 30px rgba(0,0,0,.25);
+    }
+
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .full{grid-column:1/-1}
+    label{display:block;font-size:14px;color:var(--muted);margin-bottom:6px}
+
+    input,select,button{
+      width:100%;
+      border-radius:10px;
+      border:1px solid var(--border);
+      font-size:16px;
+    }
+
+    input,select{
+      background:var(--card2);
+      color:var(--text);
+      padding:13px 14px;
+      outline:none;
+    }
+
+    input:focus,select:focus{border-color:var(--accent)}
+    button{
+      padding:13px;
+      background:#21262d;
+      color:var(--text);
+      cursor:pointer;
+      font-weight:700;
+    }
+
+    button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+    button.danger{background:#2a1517;border-color:#5a2327;color:#ffb4b0}
+    button.success{background:#18351f;border-color:#285c35;color:#b7f7c2}
+    button:hover{filter:brightness(1.08)}
+    button:disabled{opacity:.5;cursor:not-allowed}
+
+    .buttons{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:10px;
+      margin-top:16px;
+    }
+
+    .preview{
+      margin-top:20px;
+      background:#fff;
+      border-radius:14px;
+      padding:22px 14px;
+      min-height:190px;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      overflow:auto;
+    }
+
+    svg{max-width:100%;height:auto}
+    .status{margin-top:12px;min-height:22px;font-size:14px;color:var(--muted)}
+    .status.error{color:var(--danger)}
+    .status.ok{color:var(--success)}
+    .hint{margin-top:16px;color:var(--muted);font-size:13px;line-height:1.45}
+
+    .toolbar{
+      display:grid;
+      grid-template-columns:1.2fr 1fr 1fr;
+      gap:10px;
+      align-items:end;
+      margin-bottom:14px;
+    }
+
+    .toolbar-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:12px;
+    }
+    .toolbar-actions button{width:auto}
+
+    .count{color:var(--muted);font-size:13px;margin:8px 0 12px}
+
+    .barcode-list{display:grid;gap:12px}
+    .barcode-item{
+      background:var(--card2);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:14px;
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:14px;
+      align-items:center;
+    }
+
+    .barcode-info{min-width:0}
+    .barcode-name{font-weight:700;font-size:17px;margin-bottom:4px;word-break:break-word}
+    .barcode-meta{color:var(--muted);font-size:13px;line-height:1.5;word-break:break-word}
+    .barcode-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+    .barcode-actions button{width:auto;padding:9px 12px;font-size:13px}
+    .empty{
+      color:var(--muted);
+      text-align:center;
+      padding:24px 10px;
+      border:1px dashed var(--border);
+      border-radius:12px;
+    }
+
+    .editing{
+      outline:2px solid var(--accent);
+      outline-offset:2px;
+    }
+
+    .install-banner{
+      display:none;
+      margin-bottom:16px;
+      padding:12px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:var(--card);
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .install-banner.show{display:flex}
+    .install-banner button{width:auto}
+
+    @media(max-width:760px){
+      body{padding:14px}
+      .grid,.toolbar{grid-template-columns:1fr}
+      .full{grid-column:auto}
+      .buttons{grid-template-columns:1fr 1fr}
+      .barcode-item{grid-template-columns:1fr}
+      .barcode-actions{justify-content:flex-start}
+      h1{font-size:27px}
+    }
+
+    @media(max-width:440px){
+      .buttons{grid-template-columns:1fr}
+      .toolbar-actions{display:grid}
+      .toolbar-actions button{width:100%}
+    }
+
+    @media print{
+      body{background:white;padding:0}
+      .controls,h1,.subtitle,.status,.hint,.saved-section,.install-banner{display:none!important}
+      .card{border:0;box-shadow:none;padding:0}
+      .preview{min-height:0;padding:0}
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <div id="installBanner" class="install-banner">
+      <span>CodeBox kann auf diesem Gerät installiert werden.</span>
+      <button id="installBtn" class="primary">Installieren</button>
+    </div>
+
+    <h1>CodeBox</h1>
+    <div class="subtitle">Barcodes erstellen, speichern, sortieren, suchen und teilen.</div>
+
+    <section class="card" id="editorCard">
+      <div class="controls">
+        <div class="grid">
+          <div class="full">
+            <label for="name">Bezeichnung</label>
+            <input id="name" type="text" placeholder="z. B. Artikel A" autocomplete="off" />
+            <label style="display:flex;align-items:center;gap:8px;margin-top:8px;color:var(--text);cursor:pointer;">
+              <input id="useContentAsName" type="checkbox" style="width:auto;accent-color:var(--accent);" />
+              <span>Inhalt als Bezeichnung verwenden</span>
+            </label>
+          </div>
+
+          <div class="full">
+            <label for="value">Inhalt / Nummer</label>
+            <input id="value" type="text" value="123456789012" autocomplete="off" />
+          </div>
+
+          <div class="full">
+            <label for="category">Kategorie</label>
+            <input id="category" type="text" placeholder="z. B. Lager, Versand, Privat" autocomplete="off" list="categorySuggestions" />
+            <datalist id="categorySuggestions"></datalist>
+          </div>
+
+          <div>
+            <label for="format">Barcode-Typ</label>
+            <select id="format">
+              <option value="CODE128">Code 128</option>
+              <option value="EAN13">EAN-13</option>
+              <option value="EAN8">EAN-8</option>
+              <option value="UPC">UPC-A</option>
+              <option value="CODE39">Code 39</option>
+              <option value="ITF14">ITF-14</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="width">Strichbreite</label>
+            <select id="width">
+              <option value="1">Schmal</option>
+              <option value="2" selected>Normal</option>
+              <option value="3">Breit</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="height">Höhe</label>
+            <select id="height">
+              <option value="60">60 px</option>
+              <option value="90" selected>90 px</option>
+              <option value="120">120 px</option>
+              <option value="160">160 px</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="showText">Nummer anzeigen</label>
+            <select id="showText">
+              <option value="true" selected>Ja</option>
+              <option value="false">Nein</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button class="primary" id="generateBtn">Barcode erstellen</button>
+          <button class="success" id="saveBtn">Zur Liste speichern</button>
+          <button id="downloadBtn">PNG speichern</button>
+          <button id="printBtn">Drucken</button>
+        </div>
+        <div class="buttons" id="editButtons" style="display:none">
+          <button class="primary" id="updateBtn">Änderungen speichern</button>
+          <button id="cancelEditBtn">Bearbeiten abbrechen</button>
+        </div>
+      </div>
+
+      <div class="preview">
+        <svg id="barcode"></svg>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <div class="hint">
+        EAN-13, EAN-8, UPC-A und ITF-14 benötigen gültige Zahlenlängen.
+        Code 128 eignet sich am besten für beliebige Artikelnummern oder Texte.
+      </div>
+    </section>
+
+    <section class="saved-section">
+      <h2>Gespeicherte Barcodes</h2>
+
+      <div class="card">
+        <div class="toolbar">
+          <div>
+            <label for="search">Suchen</label>
+            <input id="search" type="search" placeholder="Name, Nummer oder Kategorie..." />
+          </div>
+
+          <div>
+            <label for="sortBy">Sortieren nach</label>
+            <select id="sortBy">
+              <option value="newest">Neueste zuerst</option>
+              <option value="oldest">Älteste zuerst</option>
+              <option value="nameAsc">Name A–Z</option>
+              <option value="nameDesc">Name Z–A</option>
+              <option value="numberAsc">Nummer aufsteigend</option>
+              <option value="numberDesc">Nummer absteigend</option>
+              <option value="categoryAsc">Kategorie A–Z</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="filterCategory">Kategorie filtern</label>
+            <select id="filterCategory">
+              <option value="all">Alle Kategorien</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="toolbar-actions">
+          <button id="exportBtn">Sammlung teilen</button>
+          <button id="importBtn">Sammlung importieren</button>
+          <input id="importFile" type="file" accept=".json,application/json" style="display:none" />
+          <button class="danger" id="clearAllBtn">Liste leeren</button>
+        </div>
+
+        <div id="count" class="count"></div>
+        <div id="barcodeList" class="barcode-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const nameEl = document.getElementById("name");
+    const useContentAsNameEl = document.getElementById("useContentAsName");
+    const valueEl = document.getElementById("value");
+    const categoryEl = document.getElementById("category");
+    const formatEl = document.getElementById("format");
+    const widthEl = document.getElementById("width");
+    const heightEl = document.getElementById("height");
+    const showTextEl = document.getElementById("showText");
+    const barcodeEl = document.getElementById("barcode");
+    const statusEl = document.getElementById("status");
+    const sortByEl = document.getElementById("sortBy");
+    const filterCategoryEl = document.getElementById("filterCategory");
+    const categorySuggestionsEl = document.getElementById("categorySuggestions");
+    const searchEl = document.getElementById("search");
+    const listEl = document.getElementById("barcodeList");
+    const countEl = document.getElementById("count");
+    const saveBtn = document.getElementById("saveBtn");
+    const editButtons = document.getElementById("editButtons");
+    const editorCard = document.getElementById("editorCard");
+
+    let savedBarcodes = JSON.parse(localStorage.getItem("barcodeMakerItems") || "[]");
+    let editingId = null;
+    let deferredInstallPrompt = null;
+
+    function persist() {
+      localStorage.setItem("barcodeMakerItems", JSON.stringify(savedBarcodes));
+    }
+
+    function setStatus(text, type="") {
+      statusEl.textContent = text;
+      statusEl.className = "status" + (type ? " " + type : "");
+    }
+
+    function generate() {
+      const value = valueEl.value.trim();
+
+      if (!value) {
+        setStatus("Bitte zuerst einen Inhalt eingeben.", "error");
+        return false;
+      }
+
+      try {
+        JsBarcode(barcodeEl, value, {
+          format: formatEl.value,
+          width: Number(widthEl.value),
+          height: Number(heightEl.value),
+          displayValue: showTextEl.value === "true",
+          background: "#ffffff",
+          lineColor: "#000000",
+          margin: 12,
+          fontSize: 18
+        });
+
+        setStatus("Barcode wurde erstellt.", "ok");
+        return true;
+      } catch (err) {
+        setStatus("Ungültiger Wert für diesen Barcode-Typ: " + err.message, "error");
+        return false;
+      }
+    }
+
+    function currentFormData() {
+      const value = valueEl.value.trim();
+      return {
+        name: useContentAsNameEl.checked ? value : (nameEl.value.trim() || value),
+        value,
+        category: categoryEl.value.trim() || "Ohne Kategorie",
+        format: formatEl.value,
+        width: Number(widthEl.value),
+        height: Number(heightEl.value),
+        showText: showTextEl.value === "true"
+      };
+    }
+
+    function isExactDuplicate(data, exceptId = null) {
+      return savedBarcodes.some(item =>
+        item.id !== exceptId &&
+        item.value === data.value &&
+        item.name === data.name &&
+        (item.category || "Ohne Kategorie") === data.category &&
+        item.format === data.format
+      );
+    }
+
+    function syncNameMode() {
+      if (useContentAsNameEl.checked) {
+        nameEl.value = valueEl.value.trim();
+        nameEl.disabled = true;
+      } else {
+        nameEl.disabled = false;
+      }
+    }
+
+    function saveCurrentBarcode() {
+      if (!generate()) return;
+      const data = currentFormData();
+
+      if (isExactDuplicate(data)) {
+        setStatus("Dieser Barcode ist bereits in deiner Sammlung vorhanden.", "error");
+        return;
+      }
+
+      savedBarcodes.push({
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        ...data,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      persist();
+      updateCategoryControls();
+      renderList();
+      setStatus("Barcode wurde zur Liste hinzugefügt.", "ok");
+    }
+
+    function startEdit(item) {
+      editingId = item.id;
+      useContentAsNameEl.checked = item.name === item.value;
+      nameEl.value = item.name === item.value ? item.value : item.name;
+      valueEl.value = item.value;
+      syncNameMode();
+      categoryEl.value = item.category === "Ohne Kategorie" ? "" : (item.category || "");
+      formatEl.value = item.format;
+      widthEl.value = String(item.width);
+      heightEl.value = String(item.height);
+      showTextEl.value = String(item.showText);
+
+      saveBtn.style.display = "none";
+      editButtons.style.display = "grid";
+      editorCard.classList.add("editing");
+      generate();
+      window.scrollTo({top:0, behavior:"smooth"});
+      setStatus("Eintrag wird bearbeitet.", "ok");
+    }
+
+    function updateEditedBarcode() {
+      if (!generate() || editingId === null) return;
+      const data = currentFormData();
+
+      if (isExactDuplicate(data, editingId)) {
+        setStatus("Ein identischer Barcode ist bereits vorhanden.", "error");
+        return;
+      }
+
+      const index = savedBarcodes.findIndex(item => item.id === editingId);
+      if (index === -1) return;
+
+      savedBarcodes[index] = {
+        ...savedBarcodes[index],
+        ...data,
+        updatedAt: new Date().toISOString()
+      };
+
+      persist();
+      updateCategoryControls();
+      renderList();
+      cancelEdit(false);
+      setStatus("Änderungen wurden gespeichert.", "ok");
+    }
+
+    function cancelEdit(clearStatus = true) {
+      editingId = null;
+      saveBtn.style.display = "";
+      editButtons.style.display = "none";
+      editorCard.classList.remove("editing");
+      if (clearStatus) setStatus("Bearbeiten abgebrochen.");
+    }
+
+    function updateCategoryControls() {
+      const categories = [...new Set(
+        savedBarcodes.map(item => item.category || "Ohne Kategorie")
+      )].sort((a,b) => a.localeCompare(b, "de", {sensitivity:"base"}));
+
+      const currentFilter = filterCategoryEl.value;
+      filterCategoryEl.innerHTML = '<option value="all">Alle Kategorien</option>';
+      categorySuggestionsEl.innerHTML = "";
+
+      categories.forEach(category => {
+        const option = document.createElement("option");
+        option.value = category;
+        option.textContent = category;
+        filterCategoryEl.appendChild(option);
+
+        if (category !== "Ohne Kategorie") {
+          const suggestion = document.createElement("option");
+          suggestion.value = category;
+          categorySuggestionsEl.appendChild(suggestion);
+        }
+      });
+
+      filterCategoryEl.value = [...filterCategoryEl.options].some(o => o.value === currentFilter)
+        ? currentFilter : "all";
+    }
+
+    function getVisibleItems() {
+      let items = [...savedBarcodes];
+
+      switch (sortByEl.value) {
+        case "oldest":
+          items.sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt)); break;
+        case "nameAsc":
+          items.sort((a,b) => a.name.localeCompare(b.name, "de", {sensitivity:"base"})); break;
+        case "nameDesc":
+          items.sort((a,b) => b.name.localeCompare(a.name, "de", {sensitivity:"base"})); break;
+        case "numberAsc":
+          items.sort((a,b) => a.value.localeCompare(b.value, "de", {numeric:true})); break;
+        case "numberDesc":
+          items.sort((a,b) => b.value.localeCompare(a.value, "de", {numeric:true})); break;
+        case "categoryAsc":
+          items.sort((a,b) => (a.category || "Ohne Kategorie").localeCompare((b.category || "Ohne Kategorie"), "de", {sensitivity:"base"})); break;
+        default:
+          items.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+      }
+
+      if (filterCategoryEl.value !== "all") {
+        items = items.filter(item => (item.category || "Ohne Kategorie") === filterCategoryEl.value);
+      }
+
+      const query = searchEl.value.trim().toLocaleLowerCase("de");
+      if (query) {
+        items = items.filter(item =>
+          item.name.toLocaleLowerCase("de").includes(query) ||
+          item.value.toLocaleLowerCase("de").includes(query) ||
+          (item.category || "Ohne Kategorie").toLocaleLowerCase("de").includes(query)
+        );
+      }
+
+      return items;
+    }
+
+    function renderList() {
+      listEl.innerHTML = "";
+      const items = getVisibleItems();
+
+      countEl.textContent = `${items.length} von ${savedBarcodes.length} Barcode${savedBarcodes.length === 1 ? "" : "s"} angezeigt`;
+
+      if (items.length === 0) {
+        listEl.innerHTML = '<div class="empty">Keine passenden Barcodes gefunden.</div>';
+        return;
+      }
+
+      items.forEach(item => {
+        const row = document.createElement("div");
+        row.className = "barcode-item";
+
+        const info = document.createElement("div");
+        info.className = "barcode-info";
+
+        const title = document.createElement("div");
+        title.className = "barcode-name";
+        title.textContent = item.name;
+
+        const meta = document.createElement("div");
+        meta.className = "barcode-meta";
+        meta.textContent =
+          `${item.value} · ${item.category || "Ohne Kategorie"} · ${item.format} · ` +
+          new Date(item.createdAt).toLocaleString("de-DE");
+
+        info.append(title, meta);
+
+        const actions = document.createElement("div");
+        actions.className = "barcode-actions";
+
+        const loadBtn = document.createElement("button");
+        loadBtn.textContent = "Laden";
+        loadBtn.onclick = () => {
+          useContentAsNameEl.checked = item.name === item.value;
+          nameEl.value = item.name === item.value ? item.value : item.name;
+          valueEl.value = item.value;
+          syncNameMode();
+          categoryEl.value = item.category === "Ohne Kategorie" ? "" : (item.category || "");
+          formatEl.value = item.format;
+          widthEl.value = String(item.width);
+          heightEl.value = String(item.height);
+          showTextEl.value = String(item.showText);
+          generate();
+          window.scrollTo({top:0, behavior:"smooth"});
+        };
+
+        const editBtn = document.createElement("button");
+        editBtn.textContent = "Bearbeiten";
+        editBtn.onclick = () => startEdit(item);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "Löschen";
+        deleteBtn.className = "danger";
+        deleteBtn.onclick = () => {
+          if (!confirm(`"${item.name}" wirklich löschen?`)) return;
+          savedBarcodes = savedBarcodes.filter(x => x.id !== item.id);
+          persist();
+          updateCategoryControls();
+          renderList();
+          if (editingId === item.id) cancelEdit();
+        };
+
+        actions.append(loadBtn, editBtn, deleteBtn);
+        row.append(info, actions);
+        listEl.appendChild(row);
+      });
+    }
+
+    function clearAll() {
+      if (!savedBarcodes.length) return;
+      if (!confirm("Wirklich alle gespeicherten Barcodes löschen?")) return;
+      savedBarcodes = [];
+      localStorage.removeItem("barcodeMakerItems");
+      updateCategoryControls();
+      renderList();
+      cancelEdit(false);
+      setStatus("Sammlung wurde geleert.", "ok");
+    }
+
+    function exportCollection() {
+      if (savedBarcodes.length === 0) {
+        setStatus("Es gibt noch keine gespeicherten Barcodes zum Teilen.", "error");
+        return;
+      }
+
+      const exportData = {
+        app: "Barcode Maker",
+        version: 2,
+        exportedAt: new Date().toISOString(),
+        items: savedBarcodes
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `barcode-sammlung-${new Date().toISOString().slice(0,10)}.json`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setStatus("Sammlung wurde als Datei erstellt.", "ok");
+    }
+
+    function importCollection(file) {
+      if (!file) return;
+      const reader = new FileReader();
+
+      reader.onload = function(event) {
+        try {
+          const data = JSON.parse(event.target.result);
+          const importedItems = Array.isArray(data) ? data : data.items;
+          if (!Array.isArray(importedItems)) throw new Error("Keine gültige Barcode-Sammlung gefunden.");
+
+          let added = 0;
+          let skipped = 0;
+
+          importedItems.forEach(item => {
+            if (!item || typeof item.value !== "string" || !item.value.trim()) {
+              skipped++;
+              return;
+            }
+
+            const normalized = {
+              id: Date.now() + Math.floor(Math.random() * 10000000),
+              name: (item.name && String(item.name).trim()) || String(item.value).trim(),
+              value: String(item.value).trim(),
+              category: (item.category && String(item.category).trim()) || "Ohne Kategorie",
+              format: item.format || "CODE128",
+              width: Number(item.width) || 2,
+              height: Number(item.height) || 90,
+              showText: item.showText !== false,
+              createdAt: item.createdAt || new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+
+            if (isExactDuplicate(normalized)) {
+              skipped++;
+              return;
+            }
+
+            savedBarcodes.push(normalized);
+            added++;
+          });
+
+          persist();
+          updateCategoryControls();
+          renderList();
+
+          setStatus(
+            added
+              ? `${added} Barcode${added === 1 ? "" : "s"} hinzugefügt.${skipped ? ` ${skipped} übersprungen.` : ""}`
+              : "Keine neuen Barcodes hinzugefügt.",
+            added ? "ok" : "error"
+          );
+        } catch (err) {
+          setStatus("Die Datei konnte nicht importiert werden: " + err.message, "error");
+        } finally {
+          document.getElementById("importFile").value = "";
+        }
+      };
+
+      reader.readAsText(file);
+    }
+
+    function downloadPNG() {
+      if (!generate()) return;
+
+      const serializer = new XMLSerializer();
+      const svgString = serializer.serializeToString(barcodeEl);
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+      const svgBlob = new Blob([svgString], {type:"image/svg+xml;charset=utf-8"});
+      const url = URL.createObjectURL(svgBlob);
+
+      img.onload = function() {
+        canvas.width = img.width * 2;
+        canvas.height = img.height * 2;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.scale(2, 2);
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+
+        const link = document.createElement("a");
+        link.download = "barcode-" + valueEl.value.trim().replace(/[^a-z0-9_-]/gi, "_") + ".png";
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+
+        setStatus("PNG wurde erstellt.", "ok");
+      };
+
+      img.src = url;
+    }
+
+    document.getElementById("generateBtn").addEventListener("click", generate);
+    document.getElementById("saveBtn").addEventListener("click", saveCurrentBarcode);
+    document.getElementById("updateBtn").addEventListener("click", updateEditedBarcode);
+    document.getElementById("cancelEditBtn").addEventListener("click", () => cancelEdit());
+    document.getElementById("downloadBtn").addEventListener("click", downloadPNG);
+    document.getElementById("printBtn").addEventListener("click", () => { if (generate()) window.print(); });
+    document.getElementById("clearAllBtn").addEventListener("click", clearAll);
+    document.getElementById("exportBtn").addEventListener("click", exportCollection);
+    document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
+    document.getElementById("importFile").addEventListener("change", e => importCollection(e.target.files[0]));
+
+    sortByEl.addEventListener("change", renderList);
+    filterCategoryEl.addEventListener("change", renderList);
+    searchEl.addEventListener("input", renderList);
+
+    valueEl.addEventListener("keydown", e => { if (e.key === "Enter") generate(); });
+    valueEl.addEventListener("input", () => {
+      if (useContentAsNameEl.checked) nameEl.value = valueEl.value;
+    });
+    useContentAsNameEl.addEventListener("change", syncNameMode);
+    [formatEl,widthEl,heightEl,showTextEl].forEach(el => el.addEventListener("change", generate));
+
+    window.addEventListener("beforeinstallprompt", e => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      document.getElementById("installBanner").classList.add("show");
+    });
+
+    document.getElementById("installBtn").addEventListener("click", async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      document.getElementById("installBanner").classList.remove("show");
+    });
+
+    window.addEventListener("appinstalled", () => {
+      document.getElementById("installBanner").classList.remove("show");
+    });
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch(console.error);
+      });
+    }
+
+    updateCategoryControls();
+    syncNameMode();
+    generate();
+    renderList();
+  </script>
+</body>
+</html>
