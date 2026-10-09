@@ -1,7 +1,5 @@
-const CACHE = "codebox-v2";
-const ASSETS = [
-  "./",
-  "./index.html",
+const CACHE = "codebox-v3";
+const STATIC_ASSETS = [
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
@@ -11,7 +9,7 @@ const ASSETS = [
 self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE).then(cache =>
-      Promise.allSettled(ASSETS.map(url => cache.add(url)))
+      Promise.allSettled(STATIC_ASSETS.map(url => cache.add(url)))
     )
   );
   self.skipWaiting();
@@ -27,13 +25,30 @@ self.addEventListener("activate", event => {
 });
 
 self.addEventListener("fetch", event => {
+  const request = event.request;
+
+  // HTML/Navigations immer zuerst frisch aus dem Netz holen.
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put("./index.html", copy));
+          return response;
+        })
+        .catch(() => caches.match("./index.html"))
+    );
+    return;
+  }
+
+  // Statische Dateien: Cache zuerst, dann Netzwerk.
   event.respondWith(
-    caches.match(event.request).then(cached =>
-      cached || fetch(event.request).then(response => {
-        const clone = response.clone();
-        caches.open(CACHE).then(cache => cache.put(event.request, clone));
+    caches.match(request).then(cached =>
+      cached || fetch(request).then(response => {
+        const copy = response.clone();
+        caches.open(CACHE).then(cache => cache.put(request, copy));
         return response;
-      }).catch(() => caches.match("./index.html"))
+      })
     )
   );
 });
