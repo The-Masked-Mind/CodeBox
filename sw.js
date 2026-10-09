@@ -1,4 +1,4 @@
-const CACHE = "barcode-maker-v1";
+const CACHE = "codebox-v2";
 const ASSETS = [
   "./",
   "./index.html",
