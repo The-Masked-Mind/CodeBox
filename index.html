@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CodeBox version: 2.2-custom-delete -->
+<!-- CodeBox version: 2.4-saved-settings -->
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
@@ -432,6 +432,38 @@
     }
 
 
+
+    .tabbar{
+      position:sticky;
+      top:10px;
+      z-index:50;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+      margin-bottom:18px;
+      padding:6px;
+      background:rgba(13,19,30,.88);
+      border:1px solid var(--border);
+      border-radius:16px;
+      backdrop-filter:blur(16px);
+      box-shadow:0 10px 28px rgba(0,0,0,.22);
+    }
+    .tab-btn{
+      border:0;
+      background:transparent;
+      color:var(--muted);
+      padding:12px 14px;
+      border-radius:12px;
+      font-weight:800;
+    }
+    .tab-btn.active{
+      color:#fff;
+      background:linear-gradient(135deg,var(--accent),var(--accent-2));
+      box-shadow:0 8px 20px rgba(109,124,255,.22);
+    }
+    .app-view{display:none}
+    .app-view.active{display:block}
+
     .modal-backdrop{
       position:fixed;
       inset:0;
@@ -482,7 +514,7 @@
 
     @media print{
       body{background:white;padding:0}
-      .controls,.app-header,.status,.hint,.saved-section,.install-banner,.preview-label,.app-footer{display:none!important}
+      .controls,.app-header,.status,.hint,.saved-section,.install-banner,.preview-label,.app-footer,.tabbar{display:none!important}
       .card,.preview-shell{border:0;box-shadow:none;padding:0;background:white}
       .preview{min-height:0;padding:0}
     }
@@ -505,6 +537,12 @@
       </div>
     </div>
 
+    <nav class="tabbar" aria-label="CodeBox Bereiche">
+      <button id="createTabBtn" class="tab-btn active" type="button">Erstellen</button>
+      <button id="collectionTabBtn" class="tab-btn" type="button">Sammlung</button>
+    </nav>
+
+    <div id="createView" class="app-view active">
     <section class="card" id="editorCard">
       <div class="section-title">
         <strong>Barcode erstellen</strong>
@@ -602,6 +640,9 @@
       </div>
     </section>
 
+    </div>
+
+    <div id="collectionView" class="app-view">
     <section class="saved-section">
       <h2>Gespeicherte Barcodes</h2>
 
@@ -649,6 +690,8 @@
       </div>
     </section>
 
+    </div>
+
     <footer class="app-footer">
       © 2026 <strong>The_Masked_Mind</strong> · CodeBox
     </footer>
@@ -692,11 +735,59 @@
     const deleteModalTextEl = document.getElementById("deleteModalText");
     const deleteConfirmBtn = document.getElementById("deleteConfirmBtn");
     const deleteCancelBtn = document.getElementById("deleteCancelBtn");
+    const createTabBtn = document.getElementById("createTabBtn");
+    const collectionTabBtn = document.getElementById("collectionTabBtn");
+    const createView = document.getElementById("createView");
+    const collectionView = document.getElementById("collectionView");
 
     let savedBarcodes = JSON.parse(localStorage.getItem("barcodeMakerItems") || "[]");
     let editingId = null;
     let deferredInstallPrompt = null;
     let pendingDeleteAction = null;
+
+    const SETTINGS_KEY = "codeboxLastSettings";
+
+    function saveLastSettings() {
+      const settings = {
+        category: categoryEl.value,
+        format: formatEl.value,
+        width: widthEl.value,
+        height: heightEl.value,
+        showText: showTextEl.value,
+        useContentAsName: useContentAsNameEl.checked
+      };
+
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    }
+
+    function loadLastSettings() {
+      try {
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        if (!raw) return;
+
+        const settings = JSON.parse(raw);
+
+        if (typeof settings.category === "string") categoryEl.value = settings.category;
+        if (settings.format) formatEl.value = settings.format;
+        if (settings.width) widthEl.value = settings.width;
+        if (settings.height) heightEl.value = settings.height;
+        if (settings.showText) showTextEl.value = settings.showText;
+        if (typeof settings.useContentAsName === "boolean") {
+          useContentAsNameEl.checked = settings.useContentAsName;
+        }
+      } catch (err) {
+        console.warn("Gespeicherte Einstellungen konnten nicht geladen werden.", err);
+      }
+    }
+
+    function showView(view) {
+      const showCreate = view === "create";
+      createView.classList.toggle("active", showCreate);
+      collectionView.classList.toggle("active", !showCreate);
+      createTabBtn.classList.toggle("active", showCreate);
+      collectionTabBtn.classList.toggle("active", !showCreate);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
 
     function persist() {
       localStorage.setItem("barcodeMakerItems", JSON.stringify(savedBarcodes));
@@ -852,6 +943,7 @@
       saveBtn.style.display = "none";
       editButtons.style.display = "grid";
       editorCard.classList.add("editing");
+      showView("create");
       generate();
       window.scrollTo({top:0, behavior:"smooth"});
       setStatus("Eintrag wird bearbeitet.", "ok");
@@ -997,6 +1089,7 @@
           widthEl.value = String(item.width);
           heightEl.value = String(item.height);
           showTextEl.value = String(item.showText);
+          showView("create");
           generate();
           scrollToBarcode();
         };
@@ -1176,6 +1269,9 @@
     document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
     document.getElementById("importFile").addEventListener("change", e => importCollection(e.target.files[0]));
 
+    createTabBtn.addEventListener("click", () => showView("create"));
+    collectionTabBtn.addEventListener("click", () => showView("collection"));
+
     deleteCancelBtn.addEventListener("click", closeDeleteModal);
     deleteConfirmBtn.addEventListener("click", () => {
       if (typeof pendingDeleteAction === "function") {
@@ -1197,12 +1293,25 @@
       enforceCode128Uppercase();
       if (useContentAsNameEl.checked) nameEl.value = valueEl.value;
     });
-    useContentAsNameEl.addEventListener("change", syncNameMode);
+    useContentAsNameEl.addEventListener("change", () => {
+      syncNameMode();
+      saveLastSettings();
+    });
+
+    categoryEl.addEventListener("change", saveLastSettings);
+    categoryEl.addEventListener("blur", saveLastSettings);
     formatEl.addEventListener("change", () => {
       enforceCode128Uppercase();
+      saveLastSettings();
       generate();
     });
-    [widthEl,heightEl,showTextEl].forEach(el => el.addEventListener("change", generate));
+
+    [widthEl,heightEl,showTextEl].forEach(el => {
+      el.addEventListener("change", () => {
+        saveLastSettings();
+        generate();
+      });
+    });
 
     window.addEventListener("beforeinstallprompt", e => {
       e.preventDefault();
@@ -1229,6 +1338,7 @@
     }
 
     updateCategoryControls();
+    loadLastSettings();
     syncNameMode();
     generate();
     renderList();
