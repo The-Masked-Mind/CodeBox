@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CodeBox version: 1.2 -->
+<!-- CodeBox version: 2.0-design -->
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
@@ -13,102 +13,263 @@
 
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 
+  
   <style>
     :root{
-      --bg:#0d1117;
-      --card:#161b22;
-      --card2:#0f141b;
-      --text:#f0f6fc;
-      --muted:#8b949e;
-      --border:#30363d;
-      --accent:#2f81f7;
-      --danger:#f85149;
-      --success:#3fb950;
+      --bg:#080b12;
+      --bg2:#0d111b;
+      --card:#111724;
+      --card-soft:#0d131e;
+      --text:#f7f9fc;
+      --muted:#97a0af;
+      --border:#242d3d;
+      --accent:#6d7cff;
+      --accent-2:#9a6cff;
+      --accent-soft:rgba(109,124,255,.14);
+      --danger:#ff6b72;
+      --success:#41d681;
+      --shadow:0 18px 45px rgba(0,0,0,.28);
+      --radius:20px;
     }
 
     *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+
     body{
       margin:0;
       min-height:100vh;
-      font-family:Arial,Helvetica,sans-serif;
-      background:linear-gradient(180deg,#0d1117,#090c10);
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:
+        radial-gradient(circle at top right, rgba(109,124,255,.16), transparent 32%),
+        radial-gradient(circle at top left, rgba(154,108,255,.10), transparent 28%),
+        linear-gradient(180deg,var(--bg2),var(--bg));
       color:var(--text);
       padding:24px;
     }
 
-    .app{width:min(960px,100%);margin:0 auto}
-    h1{margin:0 0 6px;font-size:32px}
-    h2{margin:28px 0 12px;font-size:22px}
-    .subtitle{color:var(--muted);margin-bottom:22px}
-    .card{
-      background:var(--card);
-      border:1px solid var(--border);
-      border-radius:16px;
-      padding:20px;
-      box-shadow:0 12px 30px rgba(0,0,0,.25);
+    .app{
+      width:min(980px,100%);
+      margin:0 auto;
     }
 
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .app-header{
+      display:flex;
+      align-items:center;
+      gap:16px;
+      margin-bottom:24px;
+      padding:6px 2px;
+    }
+
+    .logo{
+      width:58px;
+      height:58px;
+      border-radius:18px;
+      background:linear-gradient(145deg,var(--accent),var(--accent-2));
+      display:grid;
+      place-items:center;
+      box-shadow:0 12px 28px rgba(109,124,255,.28);
+      flex:0 0 auto;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .logo::before{
+      content:"";
+      width:30px;
+      height:22px;
+      background:
+        linear-gradient(90deg,
+          #fff 0 3px, transparent 3px 6px,
+          #fff 6px 8px, transparent 8px 11px,
+          #fff 11px 15px, transparent 15px 18px,
+          #fff 18px 20px, transparent 20px 23px,
+          #fff 23px 27px, transparent 27px 30px);
+      opacity:.95;
+    }
+
+    .header-copy h1{
+      margin:0;
+      font-size:clamp(28px,4vw,38px);
+      letter-spacing:-.03em;
+    }
+
+    .subtitle{
+      color:var(--muted);
+      margin-top:4px;
+      font-size:15px;
+    }
+
+    h2{
+      margin:30px 0 12px;
+      font-size:22px;
+      letter-spacing:-.02em;
+    }
+
+    .card{
+      background:linear-gradient(180deg,rgba(17,23,36,.97),rgba(13,19,30,.97));
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      padding:20px;
+      box-shadow:var(--shadow);
+      backdrop-filter:blur(14px);
+    }
+
+    .section-title{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:18px;
+    }
+
+    .section-title strong{
+      font-size:17px;
+    }
+
+    .section-badge{
+      color:#c9d0ff;
+      background:var(--accent-soft);
+      border:1px solid rgba(109,124,255,.22);
+      border-radius:999px;
+      padding:6px 10px;
+      font-size:12px;
+      font-weight:700;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:14px;
+    }
+
     .full{grid-column:1/-1}
-    label{display:block;font-size:14px;color:var(--muted);margin-bottom:6px}
+
+    label{
+      display:block;
+      font-size:13px;
+      color:var(--muted);
+      margin-bottom:7px;
+      font-weight:650;
+    }
 
     input,select,button{
       width:100%;
-      border-radius:10px;
+      border-radius:14px;
       border:1px solid var(--border);
       font-size:16px;
     }
 
     input,select{
-      background:var(--card2);
+      background:#0b111b;
       color:var(--text);
-      padding:13px 14px;
+      padding:14px 15px;
       outline:none;
+      transition:border-color .2s ease, box-shadow .2s ease, background .2s ease;
     }
 
-    input:focus,select:focus{border-color:var(--accent)}
+    input::placeholder{color:#687386}
+
+    input:focus,select:focus{
+      border-color:var(--accent);
+      box-shadow:0 0 0 4px rgba(109,124,255,.10);
+      background:#0d1420;
+    }
+
     button{
-      padding:13px;
-      background:#21262d;
+      padding:13px 15px;
+      background:#171e2c;
       color:var(--text);
       cursor:pointer;
-      font-weight:700;
+      font-weight:750;
+      transition:transform .15s ease,filter .15s ease,border-color .15s ease;
     }
 
-    button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-    button.danger{background:#2a1517;border-color:#5a2327;color:#ffb4b0}
-    button.success{background:#18351f;border-color:#285c35;color:#b7f7c2}
     button:hover{filter:brightness(1.08)}
+    button:active{transform:scale(.985)}
+
+    button.primary{
+      background:linear-gradient(135deg,var(--accent),var(--accent-2));
+      border-color:transparent;
+      color:#fff;
+      box-shadow:0 10px 24px rgba(109,124,255,.22);
+    }
+
+    button.success{
+      background:rgba(65,214,129,.10);
+      border-color:rgba(65,214,129,.22);
+      color:#bdf5d3;
+    }
+
+    button.danger{
+      background:rgba(255,107,114,.08);
+      border-color:rgba(255,107,114,.20);
+      color:#ffb8bc;
+    }
+
     button:disabled{opacity:.5;cursor:not-allowed}
 
     .buttons{
       display:grid;
       grid-template-columns:repeat(4,1fr);
       gap:10px;
-      margin-top:16px;
+      margin-top:18px;
+    }
+
+    .preview-shell{
+      margin-top:22px;
+      padding:12px;
+      background:linear-gradient(180deg,#0c121d,#0a0f18);
+      border:1px solid var(--border);
+      border-radius:18px;
+    }
+
+    .preview-label{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      color:var(--muted);
+      font-size:12px;
+      margin:2px 4px 10px;
     }
 
     .preview{
-      margin-top:20px;
       background:#fff;
       border-radius:14px;
-      padding:22px 14px;
-      min-height:190px;
+      padding:24px 16px;
+      min-height:205px;
       display:flex;
       justify-content:center;
       align-items:center;
       overflow:auto;
+      box-shadow:inset 0 0 0 1px rgba(0,0,0,.05);
     }
 
     svg{max-width:100%;height:auto}
-    .status{margin-top:12px;min-height:22px;font-size:14px;color:var(--muted)}
+
+    .status{
+      margin-top:12px;
+      min-height:22px;
+      font-size:14px;
+      color:var(--muted);
+    }
+
     .status.error{color:var(--danger)}
     .status.ok{color:var(--success)}
-    .hint{margin-top:16px;color:var(--muted);font-size:13px;line-height:1.45}
+
+    .hint{
+      margin-top:14px;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.5;
+      background:#0a1019;
+      border:1px solid rgba(255,255,255,.04);
+      border-radius:12px;
+      padding:11px 12px;
+    }
 
     .toolbar{
       display:grid;
-      grid-template-columns:1.2fr 1fr 1fr;
+      grid-template-columns:1.25fr 1fr 1fr;
       gap:10px;
       align-items:end;
       margin-bottom:14px;
@@ -118,79 +279,152 @@
       display:flex;
       gap:10px;
       flex-wrap:wrap;
-      margin-top:12px;
+      margin-top:14px;
     }
-    .toolbar-actions button{width:auto}
 
-    .count{color:var(--muted);font-size:13px;margin:8px 0 12px}
+    .toolbar-actions button{
+      width:auto;
+      min-width:150px;
+    }
 
-    .barcode-list{display:grid;gap:12px}
+    .count{
+      color:var(--muted);
+      font-size:13px;
+      margin:14px 2px 12px;
+    }
+
+    .barcode-list{
+      display:grid;
+      gap:12px;
+    }
+
     .barcode-item{
-      background:var(--card2);
+      background:linear-gradient(180deg,#0f1621,#0b111a);
       border:1px solid var(--border);
-      border-radius:14px;
-      padding:14px;
+      border-radius:16px;
+      padding:15px;
       display:grid;
       grid-template-columns:1fr auto;
       gap:14px;
       align-items:center;
+      transition:transform .15s ease,border-color .15s ease,background .15s ease;
+    }
+
+    .barcode-item:hover{
+      border-color:#36425a;
+      background:linear-gradient(180deg,#111a27,#0c131d);
+      transform:translateY(-1px);
     }
 
     .barcode-info{min-width:0}
-    .barcode-name{font-weight:700;font-size:17px;margin-bottom:4px;word-break:break-word}
-    .barcode-meta{color:var(--muted);font-size:13px;line-height:1.5;word-break:break-word}
-    .barcode-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-    .barcode-actions button{width:auto;padding:9px 12px;font-size:13px}
+
+    .barcode-name{
+      font-weight:800;
+      font-size:16px;
+      margin-bottom:5px;
+      word-break:break-word;
+    }
+
+    .barcode-meta{
+      color:var(--muted);
+      font-size:12.5px;
+      line-height:1.5;
+      word-break:break-word;
+    }
+
+    .barcode-actions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    .barcode-actions button{
+      width:auto;
+      padding:9px 12px;
+      font-size:13px;
+      border-radius:11px;
+    }
+
     .empty{
       color:var(--muted);
       text-align:center;
-      padding:24px 10px;
-      border:1px dashed var(--border);
-      border-radius:12px;
+      padding:30px 12px;
+      border:1px dashed #303a4e;
+      border-radius:14px;
+      background:#0b1119;
     }
 
     .editing{
-      outline:2px solid var(--accent);
-      outline-offset:2px;
+      outline:2px solid rgba(109,124,255,.75);
+      outline-offset:3px;
     }
 
     .install-banner{
       display:none;
       margin-bottom:16px;
-      padding:12px;
-      border:1px solid var(--border);
-      border-radius:12px;
-      background:var(--card);
+      padding:13px 14px;
+      border:1px solid rgba(109,124,255,.28);
+      border-radius:14px;
+      background:rgba(109,124,255,.10);
       gap:10px;
       align-items:center;
       justify-content:space-between;
+      box-shadow:var(--shadow);
     }
+
     .install-banner.show{display:flex}
-    .install-banner button{width:auto}
+    .install-banner button{width:auto;min-width:130px}
+
+    .checkbox-row{
+      display:flex;
+      align-items:center;
+      gap:9px;
+      margin-top:9px;
+      color:#d7dbe7;
+      cursor:pointer;
+      font-size:13px;
+      font-weight:600;
+    }
+
+    .checkbox-row input{
+      width:18px;
+      height:18px;
+      accent-color:var(--accent);
+      flex:0 0 auto;
+    }
 
     @media(max-width:760px){
       body{padding:14px}
+      .app-header{align-items:flex-start}
+      .logo{width:52px;height:52px;border-radius:16px}
       .grid,.toolbar{grid-template-columns:1fr}
       .full{grid-column:auto}
       .buttons{grid-template-columns:1fr 1fr}
       .barcode-item{grid-template-columns:1fr}
       .barcode-actions{justify-content:flex-start}
-      h1{font-size:27px}
+      .toolbar-actions{display:grid;grid-template-columns:1fr 1fr}
+      .toolbar-actions button{width:100%;min-width:0}
+      .card{padding:16px}
     }
 
-    @media(max-width:440px){
+    @media(max-width:460px){
       .buttons{grid-template-columns:1fr}
-      .toolbar-actions{display:grid}
-      .toolbar-actions button{width:100%}
+      .toolbar-actions{grid-template-columns:1fr}
+      .app-header{gap:12px}
+      .header-copy h1{font-size:29px}
+      .subtitle{font-size:14px}
+      .preview{min-height:185px;padding:20px 12px}
     }
 
     @media print{
       body{background:white;padding:0}
-      .controls,h1,.subtitle,.status,.hint,.saved-section,.install-banner{display:none!important}
-      .card{border:0;box-shadow:none;padding:0}
+      .controls,.app-header,.status,.hint,.saved-section,.install-banner,.preview-label{display:none!important}
+      .card,.preview-shell{border:0;box-shadow:none;padding:0;background:white}
       .preview{min-height:0;padding:0}
     }
   </style>
+
 </head>
 
 <body>
@@ -200,17 +434,26 @@
       <button id="installBtn" class="primary">Installieren</button>
     </div>
 
-    <h1>CodeBox</h1>
-    <div class="subtitle">Barcodes erstellen, speichern, sortieren, suchen und teilen.</div>
+    <div class="app-header">
+      <div class="logo" aria-hidden="true"></div>
+      <div class="header-copy">
+        <h1>CodeBox</h1>
+        <div class="subtitle">Deine persönliche Barcode-Sammlung.</div>
+      </div>
+    </div>
 
     <section class="card" id="editorCard">
+      <div class="section-title">
+        <strong>Barcode erstellen</strong>
+        <span class="section-badge">Generator</span>
+      </div>
       <div class="controls">
         <div class="grid">
           <div class="full">
             <label for="name">Bezeichnung</label>
             <input id="name" type="text" placeholder="z. B. Artikel A" autocomplete="off" />
-            <label style="display:flex;align-items:center;gap:8px;margin-top:8px;color:var(--text);cursor:pointer;">
-              <input id="useContentAsName" type="checkbox" style="width:auto;accent-color:var(--accent);" />
+            <label class="checkbox-row">
+              <input id="useContentAsName" type="checkbox" />
               <span>Inhalt als Bezeichnung verwenden</span>
             </label>
           </div>
@@ -278,8 +521,14 @@
         </div>
       </div>
 
-      <div class="preview" id="barcodePreview" tabindex="-1">
-        <svg id="barcode"></svg>
+      <div class="preview-shell">
+        <div class="preview-label">
+          <span>Vorschau</span>
+          <span>CodeBox</span>
+        </div>
+        <div class="preview" id="barcodePreview" tabindex="-1">
+          <svg id="barcode"></svg>
+        </div>
       </div>
 
       <div id="status" class="status"></div>
@@ -294,6 +543,10 @@
       <h2>Gespeicherte Barcodes</h2>
 
       <div class="card">
+        <div class="section-title">
+          <strong>Sammlung</strong>
+          <span class="section-badge">Lokal gespeichert</span>
+        </div>
         <div class="toolbar">
           <div>
             <label for="search">Suchen</label>

@@ -1,4 +1,4 @@
-const CACHE = "codebox-v3";
+const CACHE = "codebox-v4";
 const STATIC_ASSETS = [
   "./manifest.json",
   "./icons/icon-192.png",
