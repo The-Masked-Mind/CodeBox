@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CodeBox version: 2.1-signed -->
+<!-- CodeBox version: 2.2-custom-delete -->
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
@@ -431,6 +431,55 @@
       font-weight:700;
     }
 
+
+    .modal-backdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.68);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+      z-index:9999;
+      backdrop-filter:blur(5px);
+    }
+
+    .modal-backdrop.show{display:flex}
+
+    .modal{
+      width:min(420px,100%);
+      background:linear-gradient(180deg,#111724,#0d131e);
+      border:1px solid var(--border);
+      border-radius:20px;
+      box-shadow:0 24px 70px rgba(0,0,0,.5);
+      padding:20px;
+      animation:modalIn .16s ease-out;
+    }
+
+    @keyframes modalIn{
+      from{transform:scale(.96);opacity:0}
+      to{transform:scale(1);opacity:1}
+    }
+
+    .modal h3{
+      margin:0 0 8px;
+      font-size:20px;
+    }
+
+    .modal p{
+      margin:0;
+      color:var(--muted);
+      line-height:1.5;
+      word-break:break-word;
+    }
+
+    .modal-actions{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-top:20px;
+    }
+
     @media print{
       body{background:white;padding:0}
       .controls,.app-header,.status,.hint,.saved-section,.install-banner,.preview-label,.app-footer{display:none!important}
@@ -604,6 +653,18 @@
       © 2026 <strong>The_Masked_Mind</strong> · CodeBox
     </footer>
 
+
+    <div id="deleteModal" class="modal-backdrop" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
+        <h3 id="deleteModalTitle">Barcode löschen?</h3>
+        <p id="deleteModalText">Möchtest du diesen Barcode wirklich löschen?</p>
+        <div class="modal-actions">
+          <button id="deleteCancelBtn">Abbrechen</button>
+          <button id="deleteConfirmBtn" class="danger">Löschen</button>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <script>
@@ -627,10 +688,15 @@
     const saveBtn = document.getElementById("saveBtn");
     const editButtons = document.getElementById("editButtons");
     const editorCard = document.getElementById("editorCard");
+    const deleteModalEl = document.getElementById("deleteModal");
+    const deleteModalTextEl = document.getElementById("deleteModalText");
+    const deleteConfirmBtn = document.getElementById("deleteConfirmBtn");
+    const deleteCancelBtn = document.getElementById("deleteCancelBtn");
 
     let savedBarcodes = JSON.parse(localStorage.getItem("barcodeMakerItems") || "[]");
     let editingId = null;
     let deferredInstallPrompt = null;
+    let pendingDeleteAction = null;
 
     function persist() {
       localStorage.setItem("barcodeMakerItems", JSON.stringify(savedBarcodes));
@@ -943,12 +1009,14 @@
         deleteBtn.textContent = "Löschen";
         deleteBtn.className = "danger";
         deleteBtn.onclick = () => {
-          if (!confirm(`"${item.name}" wirklich löschen?`)) return;
-          savedBarcodes = savedBarcodes.filter(x => x.id !== item.id);
-          persist();
-          updateCategoryControls();
-          renderList();
-          if (editingId === item.id) cancelEdit();
+          openDeleteModal(`Möchtest du „${item.name}“ wirklich löschen?`, () => {
+            savedBarcodes = savedBarcodes.filter(x => x.id !== item.id);
+            persist();
+            updateCategoryControls();
+            renderList();
+            if (editingId === item.id) cancelEdit();
+            setStatus("Barcode wurde gelöscht.", "ok");
+          });
         };
 
         actions.append(loadBtn, editBtn, deleteBtn);
@@ -957,15 +1025,29 @@
       });
     }
 
+    function openDeleteModal(message, action) {
+      deleteModalTextEl.textContent = message;
+      pendingDeleteAction = action;
+      deleteModalEl.classList.add("show");
+      deleteModalEl.setAttribute("aria-hidden", "false");
+    }
+
+    function closeDeleteModal() {
+      deleteModalEl.classList.remove("show");
+      deleteModalEl.setAttribute("aria-hidden", "true");
+      pendingDeleteAction = null;
+    }
+
     function clearAll() {
       if (!savedBarcodes.length) return;
-      if (!confirm("Wirklich alle gespeicherten Barcodes löschen?")) return;
-      savedBarcodes = [];
-      localStorage.removeItem("barcodeMakerItems");
-      updateCategoryControls();
-      renderList();
-      cancelEdit(false);
-      setStatus("Sammlung wurde geleert.", "ok");
+      openDeleteModal("Möchtest du wirklich die komplette Sammlung löschen?", () => {
+        savedBarcodes = [];
+        localStorage.removeItem("barcodeMakerItems");
+        updateCategoryControls();
+        renderList();
+        cancelEdit(false);
+        setStatus("Sammlung wurde geleert.", "ok");
+      });
     }
 
     function exportCollection() {
@@ -1093,6 +1175,18 @@
     document.getElementById("exportBtn").addEventListener("click", exportCollection);
     document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
     document.getElementById("importFile").addEventListener("change", e => importCollection(e.target.files[0]));
+
+    deleteCancelBtn.addEventListener("click", closeDeleteModal);
+    deleteConfirmBtn.addEventListener("click", () => {
+      if (typeof pendingDeleteAction === "function") {
+        const action = pendingDeleteAction;
+        closeDeleteModal();
+        action();
+      }
+    });
+    deleteModalEl.addEventListener("click", e => {
+      if (e.target === deleteModalEl) closeDeleteModal();
+    });
 
     sortByEl.addEventListener("change", renderList);
     filterCategoryEl.addEventListener("change", renderList);
