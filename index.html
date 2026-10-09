@@ -277,7 +277,7 @@
         </div>
       </div>
 
-      <div class="preview">
+      <div class="preview" id="barcodePreview">
         <svg id="barcode"></svg>
       </div>
 
@@ -343,6 +343,7 @@
     const heightEl = document.getElementById("height");
     const showTextEl = document.getElementById("showText");
     const barcodeEl = document.getElementById("barcode");
+    const barcodePreviewEl = document.getElementById("barcodePreview");
     const statusEl = document.getElementById("status");
     const sortByEl = document.getElementById("sortBy");
     const filterCategoryEl = document.getElementById("filterCategory");
@@ -386,7 +387,16 @@
       }
     }
 
-    function generate() {
+    function scrollToBarcode() {
+      setTimeout(() => {
+        barcodePreviewEl.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+      }, 50);
+    }
+
+    function generate(scrollAfter = false) {
       enforceCode128Uppercase();
       const value = valueEl.value.trim();
 
@@ -408,6 +418,7 @@
         });
 
         setStatus("Barcode wurde erstellt.", "ok");
+        if (scrollAfter) scrollToBarcode();
         return true;
       } catch (err) {
         setStatus("Ungültiger Wert für diesen Barcode-Typ: " + err.message, "error");
@@ -630,7 +641,7 @@
           heightEl.value = String(item.height);
           showTextEl.value = String(item.showText);
           generate();
-          window.scrollTo({top:0, behavior:"smooth"});
+          scrollToBarcode();
         };
 
         const editBtn = document.createElement("button");
@@ -781,7 +792,7 @@
       img.src = url;
     }
 
-    document.getElementById("generateBtn").addEventListener("click", generate);
+    document.getElementById("generateBtn").addEventListener("click", () => generate(true));
     document.getElementById("saveBtn").addEventListener("click", saveCurrentBarcode);
     document.getElementById("updateBtn").addEventListener("click", updateEditedBarcode);
     document.getElementById("cancelEditBtn").addEventListener("click", () => cancelEdit());
@@ -796,7 +807,7 @@
     filterCategoryEl.addEventListener("change", renderList);
     searchEl.addEventListener("input", renderList);
 
-    valueEl.addEventListener("keydown", e => { if (e.key === "Enter") generate(); });
+    valueEl.addEventListener("keydown", e => { if (e.key === "Enter") generate(true); });
     valueEl.addEventListener("input", () => {
       enforceCode128Uppercase();
       if (useContentAsNameEl.checked) nameEl.value = valueEl.value;
