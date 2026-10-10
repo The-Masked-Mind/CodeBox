@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CodeBox version: 2.4-saved-settings -->
+<!-- CodeBox version: 2.5-two-columns -->
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
@@ -296,6 +296,7 @@
     .barcode-list{
       display:grid;
       gap:12px;
+      grid-template-columns:repeat(2,minmax(0,1fr));
     }
 
     .barcode-item{
@@ -306,8 +307,9 @@
       display:grid;
       grid-template-columns:1fr auto;
       gap:14px;
-      align-items:center;
+      align-items:start;
       transition:transform .15s ease,border-color .15s ease,background .15s ease;
+      height:100%;
     }
 
     .barcode-item:hover{
@@ -410,7 +412,8 @@
 
     @media(max-width:460px){
       .buttons{grid-template-columns:1fr}
-      .toolbar-actions{grid-template-columns:1fr}
+      .toolbar-actions{grid-template-columns:1fr 1fr}
+      .toolbar-actions .danger{grid-column:1 / -1}
       .app-header{gap:12px}
       .header-copy h1{font-size:29px}
       .subtitle{font-size:14px}
