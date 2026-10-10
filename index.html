@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CodeBox version: 2.5-two-columns -->
+<!-- CodeBox version: 2.6-compact-cards -->
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
@@ -303,11 +303,11 @@
       background:linear-gradient(180deg,#0f1621,#0b111a);
       border:1px solid var(--border);
       border-radius:16px;
-      padding:15px;
-      display:grid;
-      grid-template-columns:1fr auto;
-      gap:14px;
-      align-items:start;
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      align-items:stretch;
       transition:transform .15s ease,border-color .15s ease,background .15s ease;
       height:100%;
     }
@@ -322,30 +322,35 @@
 
     .barcode-name{
       font-weight:800;
-      font-size:16px;
-      margin-bottom:5px;
+      font-size:15px;
+      margin-bottom:3px;
       word-break:break-word;
     }
 
     .barcode-meta{
       color:var(--muted);
-      font-size:12.5px;
-      line-height:1.5;
+      font-size:11.5px;
+      line-height:1.35;
       word-break:break-word;
     }
 
     .barcode-actions{
-      display:flex;
-      gap:8px;
-      flex-wrap:wrap;
-      justify-content:flex-end;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:7px;
+      margin-top:auto;
     }
 
     .barcode-actions button{
-      width:auto;
-      padding:9px 12px;
-      font-size:13px;
-      border-radius:11px;
+      width:100%;
+      padding:9px 8px;
+      font-size:12px;
+      border-radius:10px;
+      min-width:0;
+    }
+
+    .barcode-actions .danger{
+      grid-column:1 / -1;
     }
 
     .empty{
@@ -403,8 +408,7 @@
       .grid,.toolbar{grid-template-columns:1fr}
       .full{grid-column:auto}
       .buttons{grid-template-columns:1fr 1fr}
-      .barcode-item{grid-template-columns:1fr}
-      .barcode-actions{justify-content:flex-start}
+      .barcode-actions{grid-template-columns:1fr 1fr}
       .toolbar-actions{display:grid;grid-template-columns:1fr 1fr}
       .toolbar-actions button{width:100%;min-width:0}
       .card{padding:16px}
