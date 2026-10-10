@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CodeBox version: 2.6-compact-cards -->
+<!-- CodeBox version: 2.8-settings-fix -->
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
@@ -306,10 +306,11 @@
       padding:12px;
       display:flex;
       flex-direction:column;
-      gap:10px;
+      gap:12px;
       align-items:stretch;
       transition:transform .15s ease,border-color .15s ease,background .15s ease;
       height:100%;
+      min-height:150px;
     }
 
     .barcode-item:hover{
@@ -322,8 +323,8 @@
 
     .barcode-name{
       font-weight:800;
-      font-size:15px;
-      margin-bottom:3px;
+      font-size:16px;
+      line-height:1.25;
       word-break:break-word;
     }
 
@@ -337,13 +338,13 @@
     .barcode-actions{
       display:grid;
       grid-template-columns:1fr 1fr;
-      gap:7px;
+      gap:8px;
       margin-top:auto;
     }
 
     .barcode-actions button{
       width:100%;
-      padding:9px 8px;
+      padding:10px 6px;
       font-size:12px;
       border-radius:10px;
       min-width:0;
@@ -930,6 +931,7 @@
       });
 
       persist();
+      saveLastSettings();
       updateCategoryControls();
       renderList();
       setStatus("Barcode wurde zur Liste hinzugefügt.", "ok");
@@ -1073,13 +1075,7 @@
         title.className = "barcode-name";
         title.textContent = item.name;
 
-        const meta = document.createElement("div");
-        meta.className = "barcode-meta";
-        meta.textContent =
-          `${item.value} · ${item.category || "Ohne Kategorie"} · ${item.format} · ` +
-          new Date(item.createdAt).toLocaleString("de-DE");
-
-        info.append(title, meta);
+        info.append(title);
 
         const actions = document.createElement("div");
         actions.className = "barcode-actions";
@@ -1305,6 +1301,7 @@
       saveLastSettings();
     });
 
+    categoryEl.addEventListener("input", saveLastSettings);
     categoryEl.addEventListener("change", saveLastSettings);
     categoryEl.addEventListener("blur", saveLastSettings);
     formatEl.addEventListener("change", () => {
@@ -1318,6 +1315,15 @@
         saveLastSettings();
         generate();
       });
+    });
+
+    window.addEventListener("pagehide", saveLastSettings);
+    window.addEventListener("beforeunload", saveLastSettings);
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        saveLastSettings();
+      }
     });
 
     window.addEventListener("beforeinstallprompt", e => {
