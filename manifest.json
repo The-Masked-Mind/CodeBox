@@ -1,7 +1,7 @@
 {
   "name": "CodeBox",
   "short_name": "CodeBox",
-  "description": "CodeBox v3.1.0 – Barcodes erstellen, speichern, sortieren, suchen und teilen.",
+  "description": "Barcodes erstellen, speichern, sortieren, suchen und teilen.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#080b12",
