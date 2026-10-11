@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CodeBox version: 2.9-collection-settings -->
+<!-- CodeBox version: 3.1.0 -->
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
@@ -690,7 +690,7 @@
           <button id="exportBtn">Sammlung teilen</button>
           <button id="importBtn">Sammlung importieren</button>
           <input id="importFile" type="file" accept=".json,application/json" style="display:none" />
-          <button class="danger" id="clearAllBtn">Liste leeren</button>
+          <button class="danger" id="clearAllBtn">Kategorie leeren</button>
         </div>
 
         <div id="count" class="count"></div>
@@ -701,7 +701,7 @@
     </div>
 
     <footer class="app-footer">
-      © 2026 <strong>The_Masked_Mind</strong> · CodeBox
+      © 2026 <strong>The_Masked_Mind</strong> · CodeBox · v3.1.0
     </footer>
 
 
@@ -741,6 +741,7 @@
     const editorCard = document.getElementById("editorCard");
     const deleteModalEl = document.getElementById("deleteModal");
     const deleteModalTextEl = document.getElementById("deleteModalText");
+    const deleteModalTitleEl = document.getElementById("deleteModalTitle");
     const deleteConfirmBtn = document.getElementById("deleteConfirmBtn");
     const deleteCancelBtn = document.getElementById("deleteCancelBtn");
     const createTabBtn = document.getElementById("createTabBtn");
@@ -1070,7 +1071,18 @@
       return items;
     }
 
+    function updateClearCategoryButton() {
+      const button = document.getElementById("clearAllBtn");
+      const isAll = filterCategoryEl.value === "all";
+
+      button.disabled = isAll;
+      button.title = isAll
+        ? "Wähle zuerst eine Kategorie aus"
+        : `Kategorie „${filterCategoryEl.value}“ leeren`;
+    }
+
     function renderList() {
+      updateClearCategoryButton();
       listEl.innerHTML = "";
       const items = getVisibleItems();
 
@@ -1138,7 +1150,8 @@
       });
     }
 
-    function openDeleteModal(message, action) {
+    function openDeleteModal(message, action, title = "Barcode löschen?") {
+      deleteModalTitleEl.textContent = title;
       deleteModalTextEl.textContent = message;
       pendingDeleteAction = action;
       deleteModalEl.classList.add("show");
@@ -1152,15 +1165,43 @@
     }
 
     function clearAll() {
-      if (!savedBarcodes.length) return;
-      openDeleteModal("Möchtest du wirklich die komplette Sammlung löschen?", () => {
-        savedBarcodes = [];
-        localStorage.removeItem("barcodeMakerItems");
-        updateCategoryControls();
-        renderList();
-        cancelEdit(false);
-        setStatus("Sammlung wurde geleert.", "ok");
-      });
+      const category = filterCategoryEl.value;
+
+      if (category === "all") {
+        setStatus("Bitte zuerst eine Kategorie auswählen.", "error");
+        return;
+      }
+
+      const matchingItems = savedBarcodes.filter(
+        item => (item.category || "Ohne Kategorie") === category
+      );
+
+      if (!matchingItems.length) {
+        setStatus("In dieser Kategorie gibt es keine Barcodes.", "error");
+        return;
+      }
+
+      openDeleteModal(
+        `Möchtest du wirklich alle ${matchingItems.length} Barcode${matchingItems.length === 1 ? "" : "s"} aus der Kategorie „${category}“ löschen?`,
+        () => {
+          savedBarcodes = savedBarcodes.filter(
+            item => (item.category || "Ohne Kategorie") !== category
+          );
+
+          persist();
+
+          // Nach dem Löschen auf "Alle Kategorien" wechseln.
+          filterCategoryEl.value = "all";
+          saveLastSettings();
+
+          updateCategoryControls();
+          renderList();
+          cancelEdit(false);
+
+          setStatus(`Kategorie „${category}“ wurde geleert.`, "ok");
+        },
+        "Kategorie leeren?"
+      );
     }
 
     function exportCollection() {
@@ -1369,8 +1410,24 @@
     });
 
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js").catch(console.error);
+      window.addEventListener("load", async () => {
+        try {
+          const registration = await navigator.serviceWorker.register(
+            "./sw.js?v=3.1.0",
+            { updateViaCache: "none" }
+          );
+
+          await registration.update();
+
+          let reloading = false;
+          navigator.serviceWorker.addEventListener("controllerchange", () => {
+            if (reloading) return;
+            reloading = true;
+            window.location.reload();
+          });
+        } catch (err) {
+          console.error(err);
+        }
       });
     }
 
