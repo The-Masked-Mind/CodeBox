@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CodeBox version: 3.1.1 -->
+<!-- CodeBox version: 3.2.0 -->
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
@@ -472,6 +472,68 @@
     .app-view{display:none}
     .app-view.active{display:block}
 
+
+    .collection-preview{
+      display:none;
+      margin-bottom:16px;
+      padding:12px;
+      background:linear-gradient(180deg,#0c121d,#0a0f18);
+      border:1px solid var(--border);
+      border-radius:18px;
+    }
+
+    .collection-preview.show{
+      display:block;
+    }
+
+    .collection-preview-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:10px;
+    }
+
+    .collection-preview-title{
+      min-width:0;
+    }
+
+    .collection-preview-title strong{
+      display:block;
+      font-size:15px;
+      word-break:break-word;
+    }
+
+    .collection-preview-title span{
+      display:block;
+      margin-top:2px;
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .collection-preview-head button{
+      width:auto;
+      padding:8px 11px;
+      font-size:12px;
+      border-radius:10px;
+    }
+
+    .collection-preview-box{
+      background:#fff;
+      border-radius:14px;
+      padding:20px 12px;
+      min-height:170px;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      overflow:auto;
+    }
+
+    .collection-preview-box svg{
+      max-width:100%;
+      height:auto;
+    }
+
     .modal-backdrop{
       position:fixed;
       inset:0;
@@ -659,6 +721,20 @@
           <strong>Sammlung</strong>
           <span class="section-badge">Lokal gespeichert</span>
         </div>
+
+        <div id="collectionPreview" class="collection-preview">
+          <div class="collection-preview-head">
+            <div class="collection-preview-title">
+              <strong id="collectionPreviewName">Barcode</strong>
+              <span>Vorschau</span>
+            </div>
+            <button id="closeCollectionPreviewBtn" type="button">Ausblenden</button>
+          </div>
+          <div class="collection-preview-box" id="collectionPreviewBox">
+            <svg id="collectionBarcode"></svg>
+          </div>
+        </div>
+
         <div class="toolbar">
           <div>
             <label for="search">Suchen</label>
@@ -701,7 +777,7 @@
     </div>
 
     <footer class="app-footer">
-      © 2026 <strong>The_Masked_Mind</strong> · CodeBox · v3.1.1
+      © 2026 <strong>The_Masked_Mind</strong> · CodeBox · v3.2.0
     </footer>
 
 
@@ -748,6 +824,11 @@
     const collectionTabBtn = document.getElementById("collectionTabBtn");
     const createView = document.getElementById("createView");
     const collectionView = document.getElementById("collectionView");
+    const collectionPreviewEl = document.getElementById("collectionPreview");
+    const collectionPreviewBoxEl = document.getElementById("collectionPreviewBox");
+    const collectionPreviewNameEl = document.getElementById("collectionPreviewName");
+    const collectionBarcodeEl = document.getElementById("collectionBarcode");
+    const closeCollectionPreviewBtn = document.getElementById("closeCollectionPreviewBtn");
 
     let savedBarcodes = JSON.parse(localStorage.getItem("barcodeMakerItems") || "[]");
     let editingId = null;
@@ -1087,6 +1168,51 @@
         : `Kategorie „${filterCategoryEl.value}“ leeren`;
     }
 
+    function showBarcodeInCollection(item) {
+      try {
+        const originalValue = item.value;
+        const encodedValue = item.format === "CODE39"
+          ? originalValue.toUpperCase()
+          : originalValue;
+
+        JsBarcode(collectionBarcodeEl, encodedValue, {
+          format: item.format,
+          width: Number(item.width) || 2,
+          height: Number(item.height) || 90,
+          displayValue: item.showText !== false,
+          text: originalValue,
+          background: "#ffffff",
+          lineColor: "#000000",
+          margin: 12,
+          fontSize: 18
+        });
+
+        collectionPreviewNameEl.textContent = item.name || item.value;
+        collectionPreviewEl.classList.add("show");
+
+        setTimeout(() => {
+          const rect = collectionPreviewEl.getBoundingClientRect();
+          const currentScroll =
+            window.pageYOffset ||
+            document.documentElement.scrollTop ||
+            document.body.scrollTop ||
+            0;
+
+          window.scrollTo({
+            top: Math.max(0, currentScroll + rect.top - 85),
+            behavior: "smooth"
+          });
+        }, 60);
+      } catch (err) {
+        setStatus("Der Barcode konnte nicht geladen werden: " + err.message, "error");
+      }
+    }
+
+    function hideCollectionPreview() {
+      collectionPreviewEl.classList.remove("show");
+      collectionBarcodeEl.innerHTML = "";
+    }
+
     function renderList() {
       updateClearCategoryButton();
       listEl.innerHTML = "";
@@ -1118,18 +1244,7 @@
         const loadBtn = document.createElement("button");
         loadBtn.textContent = "Laden";
         loadBtn.onclick = () => {
-          useContentAsNameEl.checked = item.name === item.value;
-          nameEl.value = item.name === item.value ? item.value : item.name;
-          valueEl.value = item.value;
-          syncNameMode();
-          categoryEl.value = item.category === "Ohne Kategorie" ? "" : (item.category || "");
-          formatEl.value = item.format;
-          widthEl.value = String(item.width);
-          heightEl.value = String(item.height);
-          showTextEl.value = String(item.showText);
-          showView("create");
-          generate();
-          scrollToBarcode();
+          showBarcodeInCollection(item);
         };
 
         const editBtn = document.createElement("button");
@@ -1146,6 +1261,7 @@
             updateCategoryControls();
             renderList();
             if (editingId === item.id) cancelEdit();
+            hideCollectionPreview();
             setStatus("Barcode wurde gelöscht.", "ok");
           });
         };
@@ -1204,6 +1320,7 @@
           renderList();
           cancelEdit(false);
 
+          hideCollectionPreview();
           setStatus(`Kategorie „${category}“ wurde geleert.`, "ok");
         },
         "Kategorie leeren?"
@@ -1338,6 +1455,7 @@
 
     createTabBtn.addEventListener("click", () => showView("create"));
     collectionTabBtn.addEventListener("click", () => showView("collection"));
+    closeCollectionPreviewBtn.addEventListener("click", hideCollectionPreview);
 
     deleteCancelBtn.addEventListener("click", closeDeleteModal);
     deleteConfirmBtn.addEventListener("click", () => {
@@ -1419,7 +1537,7 @@
       window.addEventListener("load", async () => {
         try {
           const registration = await navigator.serviceWorker.register(
-            "./sw.js?v=3.1.1",
+            "./sw.js?v=3.2.0",
             { updateViaCache: "none" }
           );
 
