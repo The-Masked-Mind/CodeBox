@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CodeBox version: 3.5.0 -->
+<!-- CodeBox version: 3.5.1 -->
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
@@ -796,7 +796,7 @@
     </div>
 
     <footer class="app-footer">
-      © 2026 <strong>The_Masked_Mind</strong> · CodeBox · v3.5.0
+      © 2026 <strong>The_Masked_Mind</strong> · CodeBox · v3.5.1
     </footer>
 
 
@@ -1450,18 +1450,35 @@
     }
     function cleanCatalog(raw) {
       if (!raw || !Array.isArray(raw.collections)) throw Error('Ungültiges Katalogformat');
-      return raw.collections.slice(0,100).map(collection => ({
-        id: String(collection.id || '').trim(),
-        name: String(collection.name || '').trim(),
-        items: Array.isArray(collection.items) ? collection.items.slice(0,10000).filter(x =>
-          x && typeof x.value === 'string' && x.value.trim()
-        ).map(x => ({
-          name: String(x.name || x.value).trim(), value: x.value.trim(),
-          category: String(x.category || collection.name || 'Ohne Kategorie'),
-          format: ['CODE128','CODE39','EAN13','EAN8','UPC','ITF14'].includes(x.format) ? x.format : 'CODE128',
-          width: Number(x.width) || 2, height: Number(x.height) || 90, showText: x.showText !== false
-        })) : []
-      })).filter(x => x.id && x.name);
+      const source = raw.collections;
+      // Older exports used "collections" as a flat list of barcodes.
+      // Convert them into actual collections grouped by category.
+      const flatItems = source.filter(entry => entry && typeof entry.value === 'string' &&
+        !Array.isArray(entry.items));
+      const grouped = new Map();
+      for (const entry of flatItems) {
+        if (!entry.value.trim()) continue;
+        const category = String(entry.category || 'Ohne Kategorie').trim() || 'Ohne Kategorie';
+        if (!grouped.has(category)) grouped.set(category, []);
+        grouped.get(category).push(entry);
+      }
+      const converted = [...grouped.entries()].map(([name, items]) => ({
+        id: 'category-' + name.toLocaleLowerCase('de').replace(/[^a-z0-9-]/g, '-'),
+        name,
+        items
+      }));
+      return [...source.filter(entry => Array.isArray(entry && entry.items)), ...converted]
+        .slice(0, 100).map(collection => ({
+          id: String(collection.id || '').trim(),
+          name: String(collection.name || '').trim(),
+          items: collection.items.slice(0, 10000).filter(x => x && typeof x.value === 'string' && x.value.trim())
+            .map(x => ({
+              name: String(x.name || x.value).trim(), value: x.value.trim(),
+              category: String(x.category || collection.name || 'Ohne Kategorie'),
+              format: ['CODE128','CODE39','EAN13','EAN8','UPC','ITF14'].includes(x.format) ? x.format : 'CODE128',
+              width: Number(x.width) || 2, height: Number(x.height) || 90, showText: x.showText !== false
+            }))
+        })).filter(x => x.id && x.name && x.items.length);
     }
     async function fetchPublicCatalog() {
       const response = await fetch('./catalog.json?v=' + Date.now(), {cache:'no-store'});
@@ -1798,7 +1815,7 @@
       window.addEventListener("load", async () => {
         try {
           const registration = await navigator.serviceWorker.register(
-            "./sw.js?v=3.5.0",
+            "./sw.js?v=3.5.1",
             { updateViaCache: "none" }
           );
 
