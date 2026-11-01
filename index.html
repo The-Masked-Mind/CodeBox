@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CodeBox version: 3.3.0 -->
+<!-- CodeBox version: 3.4.0 -->
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
@@ -484,6 +484,9 @@
 
     .collection-preview.show{
       display:block;
+      grid-column:1 / -1;
+      min-width:0;
+      scroll-margin-top:110px;
     }
 
     .collection-preview-head{
@@ -778,7 +781,7 @@
     </div>
 
     <footer class="app-footer">
-      © 2026 <strong>The_Masked_Mind</strong> · CodeBox · v3.3.0
+      © 2026 <strong>The_Masked_Mind</strong> · CodeBox · v3.4.0
     </footer>
 
 
@@ -848,6 +851,7 @@
     let editingId = null;
     let deferredInstallPrompt = null;
     let pendingDeleteAction = null;
+    let selectedCollectionBarcodeId = null;
 
     const SETTINGS_KEY = "codeboxLastSettings";
     let savedPreferences = {};
@@ -1236,103 +1240,102 @@
     }
 
     function showBarcodeInCollection(item) {
-      try {
-        const originalValue = item.value;
-        const encodedValue = item.format === "CODE39"
-          ? originalValue.toUpperCase()
-          : originalValue;
+      selectedCollectionBarcodeId = item.id;
+      renderList();
+      const selected = savedBarcodes.find(x => x.id === selectedCollectionBarcodeId);
+      if (!selected || !collectionPreviewEl.isConnected) return;
 
+      try {
+        const originalValue = selected.value;
+        const encodedValue = selected.format === "CODE39"
+          ? originalValue.toUpperCase() : originalValue;
         JsBarcode(collectionBarcodeEl, encodedValue, {
-          format: item.format,
-          width: Number(item.width) || 2,
-          height: Number(item.height) || 90,
-          displayValue: item.showText !== false,
+          format: selected.format,
+          width: Number(selected.width) || 2,
+          height: Number(selected.height) || 90,
+          displayValue: selected.showText !== false,
           text: originalValue,
           background: "#ffffff",
           lineColor: "#000000",
           margin: 12,
           fontSize: 18
         });
-
-        collectionPreviewNameEl.textContent = item.name || item.value;
+        collectionPreviewNameEl.textContent = selected.name || selected.value;
         collectionPreviewEl.classList.add("show");
-
-        setTimeout(() => {
-          const rect = collectionPreviewEl.getBoundingClientRect();
-          const currentScroll =
-            window.pageYOffset ||
-            document.documentElement.scrollTop ||
-            document.body.scrollTop ||
-            0;
-
-          window.scrollTo({
-            top: Math.max(0, currentScroll + rect.top - 85),
-            behavior: "smooth"
-          });
-        }, 60);
+        // Scroll to the preview directly above the selected row, not the page top.
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            const rect = collectionPreviewEl.getBoundingClientRect();
+            window.scrollTo({
+              top: Math.max(0, window.scrollY + rect.top - 105),
+              behavior: "smooth"
+            });
+          }, 100);
+        });
       } catch (err) {
+        hideCollectionPreview();
         setStatus("Der Barcode konnte nicht geladen werden: " + err.message, "error");
       }
     }
 
     function hideCollectionPreview() {
+      selectedCollectionBarcodeId = null;
       collectionPreviewEl.classList.remove("show");
       collectionBarcodeEl.innerHTML = "";
+      // Detached preview stays available for the next selection.
+      collectionPreviewEl.remove();
     }
 
     function renderList() {
       updateClearCategoryButton();
+      // Detach preview before rebuilding list, to preserve its SVG/event listeners.
+      collectionPreviewEl.remove();
       listEl.innerHTML = "";
       const items = getVisibleItems();
-
       countEl.textContent = `${items.length} von ${savedBarcodes.length} Barcode${savedBarcodes.length === 1 ? "" : "s"} angezeigt`;
 
-      if (items.length === 0) {
+      if (!items.length) {
+        hideCollectionPreview();
         listEl.innerHTML = '<div class="empty">Keine passenden Barcodes gefunden.</div>';
         return;
       }
+      const selectedIndex = items.findIndex(x => x.id === selectedCollectionBarcodeId);
+      if (selectedIndex < 0) hideCollectionPreview();
+      const rowStart = selectedIndex >= 0 ? Math.floor(selectedIndex / 2) * 2 : -1;
 
-      items.forEach(item => {
+      items.forEach((item, index) => {
+        // Full-width preview precedes the row containing the selected card.
+        if (index === rowStart) listEl.appendChild(collectionPreviewEl);
         const row = document.createElement("div");
         row.className = "barcode-item";
-
         const info = document.createElement("div");
         info.className = "barcode-info";
-
         const title = document.createElement("div");
         title.className = "barcode-name";
         title.textContent = item.name;
-
         info.append(title);
-
         const actions = document.createElement("div");
         actions.className = "barcode-actions";
-
         const loadBtn = document.createElement("button");
         loadBtn.textContent = "Laden";
-        loadBtn.onclick = () => {
-          showBarcodeInCollection(item);
-        };
-
+        loadBtn.onclick = () => showBarcodeInCollection(item);
         const editBtn = document.createElement("button");
         editBtn.textContent = "Bearbeiten";
         editBtn.onclick = () => startEdit(item);
-
         const deleteBtn = document.createElement("button");
         deleteBtn.textContent = "Löschen";
         deleteBtn.className = "danger";
         deleteBtn.onclick = () => {
           openDeleteModal(`Möchtest du „${item.name}“ wirklich löschen?`, () => {
             savedBarcodes = savedBarcodes.filter(x => x.id !== item.id);
+            if (selectedCollectionBarcodeId === item.id) hideCollectionPreview();
             persist();
             updateCategoryControls();
             renderList();
             if (editingId === item.id) cancelEdit();
-            hideCollectionPreview();
             setStatus("Barcode wurde gelöscht.", "ok");
           });
         };
-
         actions.append(loadBtn, editBtn, deleteBtn);
         row.append(info, actions);
         listEl.appendChild(row);
@@ -1612,7 +1615,7 @@
       window.addEventListener("load", async () => {
         try {
           const registration = await navigator.serviceWorker.register(
-            "./sw.js?v=3.3.0",
+            "./sw.js?v=3.4.0",
             { updateViaCache: "none" }
           );
 
