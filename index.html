@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CodeBox version: 3.2.0 -->
+<!-- CodeBox version: 3.3.0 -->
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
@@ -765,6 +765,7 @@
         <div class="toolbar-actions">
           <button id="exportBtn">Sammlung teilen</button>
           <button id="importBtn">Sammlung importieren</button>
+          <button id="renameCategoryBtn" type="button">Kategorie umbenennen</button>
           <input id="importFile" type="file" accept=".json,application/json" style="display:none" />
           <button class="danger" id="clearAllBtn">Kategorie leeren</button>
         </div>
@@ -777,10 +778,23 @@
     </div>
 
     <footer class="app-footer">
-      © 2026 <strong>The_Masked_Mind</strong> · CodeBox · v3.2.0
+      © 2026 <strong>The_Masked_Mind</strong> · CodeBox · v3.3.0
     </footer>
 
 
+    <div id="renameModal" class="modal-backdrop" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="renameTitle">
+        <h3 id="renameTitle">Kategorie umbenennen</h3>
+        <p>Alle Barcodes dieser Kategorie werden automatisch übernommen.</p>
+        <label for="renameCategoryInput" style="margin-top:16px;">Neuer Kategoriename</label>
+        <input id="renameCategoryInput" maxlength="100" autocomplete="off" />
+        <p id="renameError" style="color:var(--danger);margin-top:10px;" role="alert"></p>
+        <div class="modal-actions">
+          <button id="renameCancelBtn" type="button">Abbrechen</button>
+          <button id="renameConfirmBtn" type="button" class="primary">Umbenennen</button>
+        </div>
+      </div>
+    </div>
     <div id="deleteModal" class="modal-backdrop" aria-hidden="true">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
         <h3 id="deleteModalTitle">Barcode löschen?</h3>
@@ -836,9 +850,14 @@
     let pendingDeleteAction = null;
 
     const SETTINGS_KEY = "codeboxLastSettings";
+    let savedPreferences = {};
+    try {
+      savedPreferences = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") || {};
+    } catch (_) { savedPreferences = {}; }
 
     function saveLastSettings() {
-      const settings = {
+      // Keep editor selections and collection selections together. Search remains transient.
+      savedPreferences = {
         category: categoryEl.value,
         format: formatEl.value,
         width: widthEl.value,
@@ -846,38 +865,39 @@
         showText: showTextEl.value,
         useContentAsName: useContentAsNameEl.checked,
         sortBy: sortByEl.value,
-        filterCategory: filterCategoryEl.value
+        filterCategory: filterCategoryEl.value,
+        activeView: collectionView.classList.contains("active") ? "collection" : "create"
       };
-
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      try {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(savedPreferences));
+      } catch (err) {
+        console.warn("CodeBox konnte Einstellungen nicht speichern:", err);
+      }
     }
 
     function loadLastSettings() {
-      try {
-        const raw = localStorage.getItem(SETTINGS_KEY);
-        if (!raw) return;
-
-        const settings = JSON.parse(raw);
-
-        if (typeof settings.category === "string") categoryEl.value = settings.category;
-        if (settings.format) formatEl.value = settings.format;
-        if (settings.width) widthEl.value = settings.width;
-        if (settings.height) heightEl.value = settings.height;
-        if (settings.showText) showTextEl.value = settings.showText;
-        if (typeof settings.useContentAsName === "boolean") {
-          useContentAsNameEl.checked = settings.useContentAsName;
+      const settings = savedPreferences;
+      if (typeof settings.category === "string") categoryEl.value = settings.category;
+      for (const [el, value] of [
+        [formatEl, settings.format],
+        [widthEl, settings.width],
+        [heightEl, settings.height],
+        [showTextEl, settings.showText],
+        [sortByEl, settings.sortBy]
+      ]) {
+        if (value != null && [...el.options].some(o => o.value === String(value))) {
+          el.value = String(value);
         }
-
-        if (settings.sortBy && [...sortByEl.options].some(o => o.value === settings.sortBy)) {
-          sortByEl.value = settings.sortBy;
-        }
-
-        if (settings.filterCategory) {
-          filterCategoryEl.dataset.savedValue = settings.filterCategory;
-        }
-      } catch (err) {
-        console.warn("Gespeicherte Einstellungen konnten nicht geladen werden.", err);
       }
+      if (typeof settings.useContentAsName === "boolean") {
+        useContentAsNameEl.checked = settings.useContentAsName;
+      }
+      updateCategoryControls(settings.filterCategory || "all");
+      const collection = settings.activeView === "collection";
+      createView.classList.toggle("active", !collection);
+      collectionView.classList.toggle("active", collection);
+      createTabBtn.classList.toggle("active", !collection);
+      collectionTabBtn.classList.toggle("active", collection);
     }
 
     function showView(view) {
@@ -1089,7 +1109,59 @@
       if (clearStatus) setStatus("Bearbeiten abgebrochen.");
     }
 
-    function updateCategoryControls() {
+    function updateCategoryRenameButton() {
+      const renameBtn = document.getElementById("renameCategoryBtn");
+      renameBtn.disabled = filterCategoryEl.value === "all";
+      renameBtn.title = renameBtn.disabled
+        ? "Bitte zuerst eine Kategorie auswählen"
+        : "Die ausgewählte Kategorie in allen Barcodes umbenennen";
+    }
+
+    function openRenameCategory() {
+      const oldName = filterCategoryEl.value;
+      if (oldName === "all") return;
+      document.getElementById("renameCategoryInput").value = oldName;
+      document.getElementById("renameError").textContent = "";
+      document.getElementById("renameModal").classList.add("show");
+      document.getElementById("renameModal").setAttribute("aria-hidden", "false");
+      document.getElementById("renameCategoryInput").focus();
+    }
+
+    function closeRenameCategory() {
+      const modal = document.getElementById("renameModal");
+      modal.classList.remove("show");
+      modal.setAttribute("aria-hidden", "true");
+    }
+
+    function confirmRenameCategory() {
+      const oldName = filterCategoryEl.value;
+      const newName = document.getElementById("renameCategoryInput").value.trim();
+      const error = document.getElementById("renameError");
+      if (!newName || newName === "all") {
+        error.textContent = "Bitte einen gültigen Kategorienamen eingeben.";
+        return;
+      }
+      if (newName === oldName) { closeRenameCategory(); return; }
+      if (savedBarcodes.some(item =>
+          (item.category || "Ohne Kategorie").toLocaleLowerCase("de") === newName.toLocaleLowerCase("de")
+          && (item.category || "Ohne Kategorie") !== oldName)) {
+        error.textContent = "Diese Kategorie gibt es bereits.";
+        return;
+      }
+      savedBarcodes.forEach(item => {
+        if ((item.category || "Ohne Kategorie") === oldName) item.category = newName;
+      });
+      if (categoryEl.value.trim() === oldName) categoryEl.value = newName;
+      persist();
+      updateCategoryControls(newName);
+      saveLastSettings();
+      renderList();
+      hideCollectionPreview();
+      closeRenameCategory();
+      setStatus(`Kategorie „${oldName}“ heißt jetzt „${newName}“.`, "ok");
+    }
+
+    function updateCategoryControls(preferredFilter = null) {
       const categories = [...new Set(
         savedBarcodes.map(item => item.category || "Ohne Kategorie")
       )].sort((a,b) => a.localeCompare(b, "de", {sensitivity:"base"}));
@@ -1111,15 +1183,10 @@
         }
       });
 
-      const savedFilter = filterCategoryEl.dataset.savedValue;
-
-      if (savedFilter && [...filterCategoryEl.options].some(o => o.value === savedFilter)) {
-        filterCategoryEl.value = savedFilter;
-        delete filterCategoryEl.dataset.savedValue;
-      } else {
-        filterCategoryEl.value = [...filterCategoryEl.options].some(o => o.value === currentFilter)
-          ? currentFilter : "all";
-      }
+      const desired = preferredFilter === null ? currentFilter : preferredFilter;
+      filterCategoryEl.value = [...filterCategoryEl.options].some(o => o.value === desired)
+        ? desired : "all";
+      updateCategoryRenameButton();
     }
 
     function getVisibleItems() {
@@ -1453,8 +1520,15 @@
     document.getElementById("importBtn").addEventListener("click", () => document.getElementById("importFile").click());
     document.getElementById("importFile").addEventListener("change", e => importCollection(e.target.files[0]));
 
-    createTabBtn.addEventListener("click", () => showView("create"));
-    collectionTabBtn.addEventListener("click", () => showView("collection"));
+    createTabBtn.addEventListener("click", () => { showView("create"); saveLastSettings(); });
+    collectionTabBtn.addEventListener("click", () => { showView("collection"); saveLastSettings(); });
+    document.getElementById("renameCategoryBtn").addEventListener("click", openRenameCategory);
+    document.getElementById("renameCancelBtn").addEventListener("click", closeRenameCategory);
+    document.getElementById("renameConfirmBtn").addEventListener("click", confirmRenameCategory);
+    document.getElementById("renameCategoryInput").addEventListener("keydown", e => {
+      if (e.key === "Enter") confirmRenameCategory();
+      if (e.key === "Escape") closeRenameCategory();
+    });
     closeCollectionPreviewBtn.addEventListener("click", hideCollectionPreview);
 
     deleteCancelBtn.addEventListener("click", closeDeleteModal);
@@ -1475,6 +1549,7 @@
     });
 
     filterCategoryEl.addEventListener("change", () => {
+      updateCategoryRenameButton();
       saveLastSettings();
       renderList();
     });
@@ -1537,7 +1612,7 @@
       window.addEventListener("load", async () => {
         try {
           const registration = await navigator.serviceWorker.register(
-            "./sw.js?v=3.2.0",
+            "./sw.js?v=3.3.0",
             { updateViaCache: "none" }
           );
 
@@ -1557,7 +1632,6 @@
 
     updateCategoryControls();
     loadLastSettings();
-    updateCategoryControls();
     syncNameMode();
     generate();
     renderList();
