@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- CodeBox version: 3.4.0 -->
+<!-- CodeBox version: 3.5.0 -->
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
@@ -537,6 +537,20 @@
       height:auto;
     }
 
+    .modal.catalog-modal{max-height:88dvh;overflow-y:auto;width:min(640px,100%)}
+    .catalog-list{display:grid;gap:10px;margin:14px 0}
+    .catalog-line{border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+    .catalog-line button{width:auto;flex-shrink:0}
+    .catalog-admin{margin-top:16px;border-top:1px solid var(--border);padding-top:12px}
+    .catalog-admin summary{cursor:pointer;font-weight:700;padding:8px 0}
+    .catalog-admin p{color:var(--muted);font-size:13px;line-height:1.5}
+    .catalog-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+    .catalog-actions button{flex:1;min-width:130px}
+    .catalog-draft-items{max-height:240px;overflow:auto;margin:12px 0;display:grid;gap:8px}
+    .catalog-draft-row{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:center}
+    .catalog-draft-row input,.catalog-draft-row select{min-width:0;font-size:13px;padding:9px}
+    .catalog-draft-row button{width:auto;font-size:12px;padding:9px}
+    @media(max-width:460px){.catalog-draft-row{grid-template-columns:1fr 1fr}.catalog-draft-row button{grid-column:1/-1}}
     .modal-backdrop{
       position:fixed;
       inset:0;
@@ -768,6 +782,7 @@
         <div class="toolbar-actions">
           <button id="exportBtn">Sammlung teilen</button>
           <button id="importBtn">Sammlung importieren</button>
+          <button id="catalogBtn" type="button">Öffentlicher Katalog</button>
           <button id="renameCategoryBtn" type="button">Kategorie umbenennen</button>
           <input id="importFile" type="file" accept=".json,application/json" style="display:none" />
           <button class="danger" id="clearAllBtn">Kategorie leeren</button>
@@ -781,10 +796,33 @@
     </div>
 
     <footer class="app-footer">
-      © 2026 <strong>The_Masked_Mind</strong> · CodeBox · v3.4.0
+      © 2026 <strong>The_Masked_Mind</strong> · CodeBox · v3.5.0
     </footer>
 
 
+    <div id="catalogModal" class="modal-backdrop" aria-hidden="true">
+      <div class="modal catalog-modal" role="dialog" aria-modal="true" aria-labelledby="catalogTitle">
+        <div class="collection-preview-head"><h3 id="catalogTitle">Öffentliche Sammlungen</h3><button id="catalogClose" type="button">Schließen</button></div>
+        <p>Wähle eine Sammlung aus. Bestehende Barcodes bleiben erhalten.</p>
+        <div id="catalogStatus" role="status" class="status"></div>
+        <div id="publicCatalogList" class="catalog-list"></div>
+        <details class="catalog-admin">
+          <summary>Katalog verwalten (für den Herausgeber)</summary>
+          <p>Du kannst lokale Kategorien in einen Katalogentwurf übernehmen, Einträge bearbeiten und anschließend <strong>catalog.json</strong> für GitHub exportieren. Dieser Entwurf bleibt nur auf deinem Gerät. Der Export veröffentlicht nichts automatisch.</p>
+          <label for="catalogCollectionName">Name der öffentlichen Sammlung</label>
+          <input id="catalogCollectionName" placeholder="z. B. D-Hallen" maxlength="80" />
+          <label for="catalogSourceCategory" style="margin-top:10px">Barcodes aus meiner Kategorie übernehmen</label>
+          <select id="catalogSourceCategory"></select>
+          <button id="catalogAddCategory" type="button" class="primary" style="margin-top:10px">Sammlung hinzufügen / ersetzen</button>
+          <label for="catalogDraftSelect" style="margin-top:16px">Sammlung im Entwurf bearbeiten</label>
+          <select id="catalogDraftSelect"></select>
+          <div id="catalogDraftItems" class="catalog-draft-items"></div>
+          <div class="catalog-actions"><button id="catalogAddItem" type="button">Barcode hinzufügen</button><button id="catalogDeleteCollection" class="danger" type="button">Sammlung entfernen</button></div>
+          <div class="catalog-actions"><button id="catalogLoadPublished" type="button">Online-Katalog in Entwurf laden</button><button id="catalogExport" class="success" type="button">catalog.json exportieren</button></div>
+          <p>Die Datei <code>catalog.json</code> im Stammverzeichnis deines GitHub-Repositories ersetzen. Alle Nutzer sehen danach die neuen öffentlichen Sammlungen.</p>
+        </details>
+      </div>
+    </div>
     <div id="renameModal" class="modal-backdrop" aria-hidden="true">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="renameTitle">
         <h3 id="renameTitle">Kategorie umbenennen</h3>
@@ -1397,6 +1435,151 @@
       );
     }
 
+    // Public catalog: static public JSON on GitHub Pages, editable draft in this device only.
+    const CATALOG_DRAFT_KEY = 'codeboxPublicCatalogDraftV1';
+    let publicCatalog = [];
+    let catalogDraft = [];
+    const catalogModal = document.getElementById('catalogModal');
+    const catalogStatus = document.getElementById('catalogStatus');
+    const catalogList = document.getElementById('publicCatalogList');
+    const draftSelect = document.getElementById('catalogDraftSelect');
+
+    function catalogMessage(message, error = false) {
+      catalogStatus.textContent = message;
+      catalogStatus.className = 'status ' + (error ? 'error' : 'ok');
+    }
+    function cleanCatalog(raw) {
+      if (!raw || !Array.isArray(raw.collections)) throw Error('Ungültiges Katalogformat');
+      return raw.collections.slice(0,100).map(collection => ({
+        id: String(collection.id || '').trim(),
+        name: String(collection.name || '').trim(),
+        items: Array.isArray(collection.items) ? collection.items.slice(0,10000).filter(x =>
+          x && typeof x.value === 'string' && x.value.trim()
+        ).map(x => ({
+          name: String(x.name || x.value).trim(), value: x.value.trim(),
+          category: String(x.category || collection.name || 'Ohne Kategorie'),
+          format: ['CODE128','CODE39','EAN13','EAN8','UPC','ITF14'].includes(x.format) ? x.format : 'CODE128',
+          width: Number(x.width) || 2, height: Number(x.height) || 90, showText: x.showText !== false
+        })) : []
+      })).filter(x => x.id && x.name);
+    }
+    async function fetchPublicCatalog() {
+      const response = await fetch('./catalog.json?v=' + Date.now(), {cache:'no-store'});
+      if (!response.ok) throw Error('Katalog-Datei nicht erreichbar');
+      return cleanCatalog(await response.json());
+    }
+    function renderPublicCatalog() {
+      catalogList.replaceChildren();
+      if (!publicCatalog.length) {
+        const message = document.createElement('p');
+        message.textContent = 'Noch keine öffentlichen Sammlungen veröffentlicht.';
+        catalogList.append(message);
+      }
+      publicCatalog.forEach(collection => {
+        const line = document.createElement('div'); line.className='catalog-line';
+        const info=document.createElement('div');
+        const title=document.createElement('strong'); title.textContent=collection.name;
+        const count=document.createElement('div'); count.className='barcode-meta';
+        count.textContent=collection.items.length+' Barcodes'; info.append(title,count);
+        const button=document.createElement('button'); button.textContent='Hinzufügen';
+        button.addEventListener('click',()=>importPublicCollection(collection));
+        line.append(info,button);catalogList.append(line);
+      });
+    }
+    function importPublicCollection(collection) {
+      let added=0, skipped=0;
+      const now=new Date().toISOString();
+      for (const item of collection.items) {
+        // Compare against the collection already on the device and the items just imported.
+        if (isExactDuplicate(item)) {skipped++;continue;}
+        savedBarcodes.push({...item,id:Date.now()+Math.floor(Math.random()*1000000000),createdAt:now,updatedAt:now});
+        added++;
+      }
+      try { persist(); } catch(e) { catalogMessage('Speichern fehlgeschlagen: '+e.message,true); return; }
+      updateCategoryControls();renderList();
+      catalogMessage(collection.name+': '+added+' hinzugefügt, '+skipped+' bereits vorhanden.');
+    }
+    function saveCatalogDraft() {
+      try {localStorage.setItem(CATALOG_DRAFT_KEY,JSON.stringify({collections:catalogDraft}));}
+      catch(e){catalogMessage('Entwurf konnte nicht gespeichert werden.',true);}
+    }
+    function updateDraftUI(selectedId) {
+      const source=document.getElementById('catalogSourceCategory');
+      const prev=source.value;source.replaceChildren();
+      [...new Set(savedBarcodes.map(x=>x.category||'Ohne Kategorie'))].sort().forEach(category=>{
+        source.add(new Option(category,category));
+      });
+      if ([...source.options].some(x=>x.value===prev)) source.value=prev;
+      draftSelect.replaceChildren();
+      catalogDraft.forEach(c=>draftSelect.add(new Option(c.name,c.id)));
+      if (selectedId && catalogDraft.some(c=>c.id===selectedId)) draftSelect.value=selectedId;
+      renderDraftItems();
+    }
+    function renderDraftItems() {
+      const root=document.getElementById('catalogDraftItems');root.replaceChildren();
+      const selected=catalogDraft.find(c=>c.id===draftSelect.value);
+      if (!selected) return;
+      selected.items.forEach((item,index)=>{
+        const line=document.createElement('div');line.className='catalog-draft-row';
+        const name=document.createElement('input');name.value=item.name;name.setAttribute('aria-label','Bezeichnung');
+        const value=document.createElement('input');value.value=item.value;value.setAttribute('aria-label','Barcode-Inhalt');
+        const del=document.createElement('button');del.className='danger';del.textContent='Entfernen';
+        name.addEventListener('change',()=>{item.name=name.value.trim()||item.value;saveCatalogDraft();});
+        value.addEventListener('change',()=>{if(!value.value.trim()){value.value=item.value;return;} item.value=value.value.trim();saveCatalogDraft();});
+        del.addEventListener('click',()=>{selected.items.splice(index,1);saveCatalogDraft();renderDraftItems();});
+        line.append(name,value,del);root.append(line);
+      });
+    }
+    function addDraftCategory() {
+      const name=document.getElementById('catalogCollectionName').value.trim();
+      const category=document.getElementById('catalogSourceCategory').value;
+      if (!name || !category) {catalogMessage('Name und vorhandene Kategorie auswählen.',true);return;}
+      const matches=savedBarcodes.filter(x=>(x.category||'Ohne Kategorie')===category);
+      if (!matches.length){catalogMessage('Kategorie hat keine Barcodes.',true);return;}
+      const id=name.toLocaleLowerCase('de').replace(/[^a-z0-9äöüß]+/gi,'-').replace(/^-|-$/g,'') || 'sammlung';
+      const existing=catalogDraft.findIndex(x=>x.id===id);
+      const oldItems=existing>=0 ? catalogDraft[existing].items : [];
+      const items=matches.map(x=>({name:x.name,value:x.value,category:x.category,format:x.format,width:x.width,height:x.height,showText:x.showText}));
+      const updated={id,name,items};
+      if(existing>=0){if(!confirm('Den bisherigen Entwurf für „'+name+'“ ersetzen?'))return;catalogDraft[existing]=updated;}
+      else catalogDraft.push(updated);
+      saveCatalogDraft();updateDraftUI(id);catalogMessage(items.length+' Barcodes in den Entwurf übernommen.');
+    }
+    async function openCatalog() {
+      catalogModal.classList.add('show');catalogModal.setAttribute('aria-hidden','false');
+      catalogMessage('Lade öffentlichen Katalog …');
+      try {publicCatalog=await fetchPublicCatalog();catalogMessage('Katalog geladen.');}
+      catch(e){publicCatalog=[];catalogMessage('Öffentlicher Katalog nicht erreichbar. Datei catalog.json auf GitHub hochladen.',true);}
+      renderPublicCatalog();
+      try {catalogDraft=cleanCatalog(JSON.parse(localStorage.getItem(CATALOG_DRAFT_KEY)||'{"collections":[]}'));}
+      catch(e){catalogDraft=[];}
+      updateDraftUI();
+    }
+    document.getElementById('catalogBtn').addEventListener('click',openCatalog);
+    document.getElementById('catalogClose').addEventListener('click',()=>{catalogModal.classList.remove('show');catalogModal.setAttribute('aria-hidden','true');});
+    document.getElementById('catalogAddCategory').addEventListener('click',addDraftCategory);
+    draftSelect.addEventListener('change',renderDraftItems);
+    document.getElementById('catalogAddItem').addEventListener('click',()=>{
+      const selected=catalogDraft.find(x=>x.id===draftSelect.value);if(!selected){catalogMessage('Bitte Sammlung auswählen.',true);return;}
+      selected.items.push({name:'Neuer Barcode',value:'NEUER-CODE',category:selected.name,format:'CODE128',width:2,height:90,showText:true});
+      saveCatalogDraft();renderDraftItems();
+    });
+    document.getElementById('catalogDeleteCollection').addEventListener('click',()=>{
+      const selected=catalogDraft.find(x=>x.id===draftSelect.value);if(!selected)return;
+      if(!confirm('„'+selected.name+'“ aus dem Katalogentwurf entfernen?'))return;
+      catalogDraft=catalogDraft.filter(x=>x.id!==selected.id);saveCatalogDraft();updateDraftUI();
+    });
+    document.getElementById('catalogLoadPublished').addEventListener('click',async()=>{
+      if(catalogDraft.length && !confirm('Lokalen Entwurf durch den Online-Katalog ersetzen?'))return;
+      try {catalogDraft=await fetchPublicCatalog();saveCatalogDraft();updateDraftUI();catalogMessage('Online-Katalog als Entwurf geladen.');}
+      catch(e){catalogMessage(e.message,true);}
+    });
+    document.getElementById('catalogExport').addEventListener('click',()=>{
+      const blob=new Blob([JSON.stringify({app:'CodeBox',version:1,collections:catalogDraft},null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob), a=document.createElement('a');a.href=url;a.download='catalog.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      catalogMessage('catalog.json heruntergeladen – jetzt auf GitHub hochladen.');
+    });
+
     function exportCollection() {
       if (savedBarcodes.length === 0) {
         setStatus("Es gibt noch keine gespeicherten Barcodes zum Teilen.", "error");
@@ -1615,7 +1798,7 @@
       window.addEventListener("load", async () => {
         try {
           const registration = await navigator.serviceWorker.register(
-            "./sw.js?v=3.4.0",
+            "./sw.js?v=3.5.0",
             { updateViaCache: "none" }
           );
 
